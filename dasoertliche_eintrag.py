@@ -40,30 +40,38 @@ def validiere(c):
 
 
 def cookie_banner_schliessen(page):
+    # Schritt 1: Button klicken falls sichtbar
     try:
-        # Warten bis Cookie-Banner erscheint
-        page.wait_for_selector("text=Ablehnen", timeout=8000)
-        # Direkt auf Ablehnen klicken
+        page.wait_for_selector("button:has-text('Ablehnen')", timeout=6000)
         page.click("button:has-text('Ablehnen')")
         time.sleep(1.5)
-        print("  OK Cookie-Banner abgelehnt")
+        print("  OK Cookie-Banner per Button abgelehnt")
     except PlaywrightTimeout:
-        # Kein Banner erschienen - OK
-        print("  - Kein Cookie-Banner")
-    except Exception as e:
-        # Fallback: per JavaScript entfernen
         try:
-            page.evaluate("""
-                () => {
-                    document.querySelectorAll('[class*="cmp"], [id*="cmp"], [class*="cookie"], [id*="cookie"]')
-                        .forEach(el => el.remove());
-                    document.body.style.overflow = 'auto';
-                }
-            """)
-            time.sleep(1)
-            print("  OK Cookie-Banner per JS entfernt")
-        except Exception:
-            print(f"  - Cookie-Banner Fehler: {e}")
+            page.wait_for_selector("button:has-text('Alle Akzeptieren')", timeout=3000)
+            page.click("button:has-text('Alle Akzeptieren')")
+            time.sleep(1.5)
+            print("  OK Cookie-Banner akzeptiert")
+        except PlaywrightTimeout:
+            print("  - Kein Cookie-Button gefunden")
+
+    # Schritt 2: cmpwrapper IMMER aus DOM entfernen (blockiert sonst Klicks)
+    page.evaluate("""
+        () => {
+            const selectors = [
+                '#cmpwrapper', '.cmpwrapper',
+                '#usercentrics-root',
+                '[id*="cmp"]', '[class*="cmpwrap"]'
+            ];
+            selectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => el.remove());
+            });
+            document.body.style.overflow = 'auto';
+            document.documentElement.style.overflow = 'auto';
+        }
+    """)
+    time.sleep(0.5)
+    print("  OK cmpwrapper entfernt")
 
 
 def tippe(page, selector, wert):
