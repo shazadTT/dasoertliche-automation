@@ -106,6 +106,34 @@ def fill_form(page, c):
     page.wait_for_selector("#companyname", timeout=15000)
     time.sleep(1)
 
+    # cmpwrapper nochmal entfernen - wird nach Seitennavigation neu geladen
+    page.evaluate("""
+        () => {
+            document.querySelectorAll('#cmpwrapper, .cmpwrapper, [id*="cmp"]')
+                .forEach(el => el.remove());
+            document.body.style.overflow = 'auto';
+        }
+    """)
+    # MutationObserver: verhindert dass cmpwrapper wieder erscheint
+    page.evaluate("""
+        () => {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.id && node.id.includes('cmp')) {
+                            node.remove();
+                        }
+                        if (node.className && typeof node.className === 'string' && node.className.includes('cmp')) {
+                            node.remove();
+                        }
+                    });
+                });
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+    """)
+    time.sleep(0.5)
+
     # Adresse befuellen - Telefon-Felder werden danach freigeschaltet
     tippe(page, "#companyname", c["firma"])
     tippe(page, "#companystreet", c["strasse"])
