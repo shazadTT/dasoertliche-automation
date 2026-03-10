@@ -64,6 +64,19 @@ def cookie_banner_schliessen(page):
         print(f"  - Cookie-Banner: {e}")
 
 
+def tippe(page, selector, wert):
+    """Tippt Zeichen fuer Zeichen - aktiviert React/JS Validierung."""
+    locator = page.locator(selector)
+    locator.click()
+    time.sleep(0.2)
+    locator.fill("")
+    for zeichen in wert:
+        locator.press(zeichen)
+        time.sleep(0.05)
+    locator.press("Tab")
+    time.sleep(0.3)
+
+
 def fill_form(page, c):
     print(f"\nStarte Eintrag fuer: {c['firma']}")
 
@@ -73,68 +86,79 @@ def fill_form(page, c):
 
     cookie_banner_schliessen(page)
 
+    # Grundeintrag waehlen
     page.wait_for_selector("text=Los geht's", timeout=15000)
     page.click("text=Los geht's")
     time.sleep(2)
     print("  OK Grundeintrag gewaehlt")
 
-    # Schritt 1: Adresse + Kontakt + Branche
+    # Schritt 1: Adresse
     page.wait_for_selector("#companyname", timeout=15000)
     time.sleep(1)
 
-    ids = page.evaluate("() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null).map(i => i.id + '/' + i.name)")
-    print(f"  DEBUG Schritt1 Inputs: {ids}")
-
-    page.locator("#companyname").fill(c["firma"])
-    time.sleep(0.3)
-    page.locator("#companystreet").fill(c["strasse"])
-    time.sleep(0.3)
+    # Adresse befuellen - Telefon-Felder werden danach freigeschaltet
+    tippe(page, "#companyname", c["firma"])
+    tippe(page, "#companystreet", c["strasse"])
     if c["hausnummer"]:
-        page.locator("#companyhnr").fill(c["hausnummer"])
-        time.sleep(0.3)
-    page.locator("#companypc").fill(c["plz"])
-    time.sleep(0.5)
-    page.locator("#companycity").fill(c["ort"])
+        tippe(page, "#companyhnr", c["hausnummer"])
+    tippe(page, "#companypc", c["plz"])
+
+    # Ort befuellen und auf Dropdown warten
+    page.locator("#companycity").click()
+    time.sleep(0.2)
+    for zeichen in c["ort"]:
+        page.locator("#companycity").press(zeichen)
+        time.sleep(0.05)
     time.sleep(1)
     try:
         page.locator("#citylist li").first.click(timeout=3000)
-        time.sleep(0.5)
+        print("  OK Ort aus Dropdown gewaehlt")
+        time.sleep(1)
     except PlaywrightTimeout:
-        pass
+        page.locator("#companycity").press("Tab")
+        print("  - Ort Dropdown nicht erschienen")
+        time.sleep(0.5)
 
+    # Warten bis Telefon-Felder enabled werden
+    print("  Warte auf Freischaltung der Telefon-Felder...")
+    try:
+        page.wait_for_selector("#companytelpre:not([disabled])", timeout=10000)
+        print("  OK Telefon-Felder freigeschaltet")
+    except PlaywrightTimeout:
+        print("  - Telefon-Felder noch disabled, versuche trotzdem...")
+
+    # Telefon befuellen
     if c["telpre"] and c["telnummer"]:
-        page.locator("#companytelpre").fill(c["telpre"])
-        time.sleep(0.3)
-        page.locator("#companytelnumber").fill(c["telnummer"])
-        time.sleep(0.3)
+        tippe(page, "#companytelpre", c["telpre"])
+        tippe(page, "#companytelnumber", c["telnummer"])
 
     if c["mobtelpre"] and c["mobtelnummer"]:
-        page.locator("#companymobtelpre").fill(c["mobtelpre"])
-        time.sleep(0.3)
-        page.locator("#companymobtelnumber").fill(c["mobtelnummer"])
-        time.sleep(0.3)
+        tippe(page, "#companymobtelpre", c["mobtelpre"])
+        tippe(page, "#companymobtelnumber", c["mobtelnummer"])
 
+    # Optional
     if c["website"]:
-        page.locator("#companyurl").fill(c["website"])
-        time.sleep(0.3)
+        tippe(page, "#companyurl", c["website"])
     if c["email"]:
-        page.locator("#companyemail").fill(c["email"])
-        time.sleep(0.3)
+        tippe(page, "#companyemail", c["email"])
     if c["facebook"]:
-        page.locator("#socfacebook").fill(c["facebook"])
-        time.sleep(0.3)
+        tippe(page, "#socfacebook", c["facebook"])
     if c["instagram"]:
-        page.locator("#socinstagram").fill(c["instagram"])
-        time.sleep(0.3)
+        tippe(page, "#socinstagram", c["instagram"])
 
-    page.locator("#rubric").fill(c["branche"])
+    # Branche
+    page.locator("#rubric").click()
+    time.sleep(0.2)
+    for zeichen in c["branche"]:
+        page.locator("#rubric").press(zeichen)
+        time.sleep(0.05)
     time.sleep(2)
     try:
         page.locator("#rubriclist li").first.click(timeout=4000)
-        print(f"  OK Branche aus Dropdown gewaehlt")
+        print(f"  OK Branche gewaehlt")
     except PlaywrightTimeout:
-        print(f"  - Branche Dropdown nicht erschienen, Enter druecken")
         page.locator("#rubric").press("Enter")
+        print(f"  - Branche per Enter bestaetigt")
     time.sleep(0.5)
 
     page.locator("#SubmitForward").click()
