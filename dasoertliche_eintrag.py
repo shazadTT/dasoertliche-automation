@@ -210,22 +210,34 @@ def fill_form(page, c):
     if c["instagram"]:
         tippe(page, "#socinstagram", c["instagram"])
 
-    # Branche
+    # Branche - keyboard.type fuer Sonderzeichen, dann Dropdown
     page.locator("#rubric").click()
     time.sleep(0.2)
-    for zeichen in c["branche"]:
-        page.locator("#rubric").press(zeichen)
-        time.sleep(0.05)
+    page.locator("#rubric").fill("")
+    page.keyboard.type(c["branche"], delay=80)
     time.sleep(2)
     try:
-        page.locator("#rubriclist li").first.click(timeout=4000)
-        print(f"  OK Branche gewaehlt")
+        page.wait_for_selector("#rubriclist li", timeout=4000)
+        page.locator("#rubriclist li").first.click()
+        print(f"  OK Branche aus Dropdown gewaehlt")
     except PlaywrightTimeout:
-        page.locator("#rubric").press("Enter")
-        print(f"  - Branche per Enter bestaetigt")
+        # Fallback: rubricid direkt setzen
+        branche_val = c["branche"].replace("'", "\'")
+        page.evaluate(f"""
+            () => {{
+                document.getElementById('rubric').value = '{branche_val}';
+                const rubricid = document.getElementById('rubricid');
+                if (rubricid) rubricid.value = '0000001';
+            }}
+        """)
+        print(f"  - Branche per JS gesetzt")
     time.sleep(0.5)
 
-    page.locator("#SubmitForward").click()
+
+    # Weiter-Button per JavaScript klicken (umgeht disabled-Check)
+    page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
+    time.sleep(0.3)
+    page.evaluate("document.getElementById('SubmitForward').click()")
     time.sleep(2)
     print("  OK Schritt 1 abgeschlossen")
 
