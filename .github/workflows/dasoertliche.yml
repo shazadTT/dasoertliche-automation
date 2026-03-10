@@ -1,0 +1,127 @@
+name: Das Örtliche Eintrag
+
+on:
+  workflow_dispatch:
+    inputs:
+      firma:
+        description: 'Firmenname'
+        required: true
+      strasse:
+        description: 'Straße'
+        required: true
+      hausnummer:
+        description: 'Hausnummer'
+        required: false
+        default: ''
+      plz:
+        description: 'Postleitzahl'
+        required: true
+      ort:
+        description: 'Ort'
+        required: true
+      telpre:
+        description: 'Festnetz-Vorwahl (z.B. 0511)'
+        required: false
+        default: ''
+      telnummer:
+        description: 'Festnetz-Nummer (z.B. 123456)'
+        required: false
+        default: ''
+      mobtelpre:
+        description: 'Mobil-Vorwahl (z.B. 0151)'
+        required: false
+        default: ''
+      mobtelnummer:
+        description: 'Mobil-Nummer (z.B. 12345678)'
+        required: false
+        default: ''
+      email:
+        description: 'E-Mail des Unternehmens'
+        required: false
+        default: ''
+      website:
+        description: 'Website URL'
+        required: false
+        default: ''
+      facebook:
+        description: 'Facebook URL'
+        required: false
+        default: ''
+      instagram:
+        description: 'Instagram URL'
+        required: false
+        default: ''
+      branche:
+        description: 'Branche (z.B. Überdachungen)'
+        required: true
+      beschreibung:
+        description: 'Unternehmens-Infos (max. 500 Zeichen)'
+        required: false
+        default: ''
+      kontakt_vorname:
+        description: 'Ansprechpartner Vorname'
+        required: true
+      kontakt_nachname:
+        description: 'Ansprechpartner Nachname'
+        required: true
+      kontakt_telpre:
+        description: 'Ansprechpartner Festnetz-Vorwahl'
+        required: true
+      kontakt_telnummer:
+        description: 'Ansprechpartner Festnetz-Nummer'
+        required: true
+      kontakt_email:
+        description: 'Ansprechpartner E-Mail'
+        required: true
+
+jobs:
+  eintrag:
+    name: eintrag
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Abhängigkeiten installieren
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Das Örtliche Formular ausfüllen
+        env:
+          FIRMA: ${{ github.event.inputs.firma }}
+          STRASSE: ${{ github.event.inputs.strasse }}
+          HAUSNUMMER: ${{ github.event.inputs.hausnummer }}
+          PLZ: ${{ github.event.inputs.plz }}
+          ORT: ${{ github.event.inputs.ort }}
+          TELPRE: ${{ github.event.inputs.telpre }}
+          TELNUMMER: ${{ github.event.inputs.telnummer }}
+          MOBTELPRE: ${{ github.event.inputs.mobtelpre }}
+          MOBTELNUMMER: ${{ github.event.inputs.mobtelnummer }}
+          EMAIL: ${{ github.event.inputs.email }}
+          WEBSITE: ${{ github.event.inputs.website }}
+          FACEBOOK: ${{ github.event.inputs.facebook }}
+          INSTAGRAM: ${{ github.event.inputs.instagram }}
+          BRANCHE: ${{ github.event.inputs.branche }}
+          BESCHREIBUNG: ${{ github.event.inputs.beschreibung }}
+          KONTAKT_VORNAME: ${{ github.event.inputs.kontakt_vorname }}
+          KONTAKT_NACHNAME: ${{ github.event.inputs.kontakt_nachname }}
+          KONTAKT_TELPRE: ${{ github.event.inputs.kontakt_telpre }}
+          KONTAKT_TELNUMMER: ${{ github.event.inputs.kontakt_telnummer }}
+          KONTAKT_EMAIL: ${{ github.event.inputs.kontakt_email }}
+        run: python dasoertliche_eintrag.py
+
+      - name: Screenshot bei Fehler hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fehler-screenshot
+          path: fehler_screenshot.png
+          retention-days: 7
