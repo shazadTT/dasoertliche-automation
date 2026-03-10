@@ -1,246 +1,95 @@
-import os
-import time
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
+Search logs
+1s
+1s
+0s
+13s
+43s
+Run python dasoertliche_eintrag.py
+=======================================================
+Das Oertliche Automatisierung
+=======================================================
 
-def get_data():
-    return {
-        "firma":             os.environ.get("FIRMA", ""),
-        "strasse":           os.environ.get("STRASSE", ""),
-        "hausnummer":        os.environ.get("HAUSNUMMER", ""),
-        "plz":               os.environ.get("PLZ", ""),
-        "ort":               os.environ.get("ORT", ""),
-        "telpre":            os.environ.get("TELPRE", ""),
-        "telnummer":         os.environ.get("TELNUMMER", ""),
-        "mobtelpre":         os.environ.get("MOBTELPRE", ""),
-        "mobtelnummer":      os.environ.get("MOBTELNUMMER", ""),
-        "email":             os.environ.get("EMAIL", ""),
-        "website":           os.environ.get("WEBSITE", ""),
-        "facebook":          os.environ.get("FACEBOOK", ""),
-        "instagram":         os.environ.get("INSTAGRAM", ""),
-        "branche":           os.environ.get("BRANCHE", ""),
-        "beschreibung":      os.environ.get("BESCHREIBUNG", ""),
-        "kontakt_vorname":   os.environ.get("KONTAKT_VORNAME", ""),
-        "kontakt_nachname":  os.environ.get("KONTAKT_NACHNAME", ""),
-        "kontakt_telpre":    os.environ.get("KONTAKT_TELPRE", ""),
-        "kontakt_telnummer": os.environ.get("KONTAKT_TELNUMMER", ""),
-        "kontakt_email":     os.environ.get("KONTAKT_EMAIL", ""),
-    }
+Starte Eintrag fuer: Opopumfrima
+  OK Cookie-Banner entfernt
+  OK Grundeintrag gewaehlt
 
-
-def validiere(c):
-    pflicht = ["firma", "strasse", "plz", "ort", "branche",
-               "kontakt_vorname", "kontakt_nachname",
-               "kontakt_telpre", "kontakt_telnummer", "kontakt_email"]
-    fehlend = [f for f in pflicht if not c.get(f)]
-    if fehlend:
-        raise ValueError(f"Pflichtfelder fehlen: {', '.join(fehlend)}")
-    if not c.get("telpre") and not c.get("mobtelpre"):
-        raise ValueError("Mindestens Festnetz-Vorwahl oder Mobil-Vorwahl erforderlich")
-
-
-def cookie_banner_schliessen(page):
-    try:
-        page.evaluate("""
-            () => {
-                const ucRoot = document.querySelector('#usercentrics-root');
-                if (ucRoot && ucRoot.shadowRoot) {
-                    const buttons = Array.from(ucRoot.shadowRoot.querySelectorAll('button'));
-                    const btn = buttons.find(b =>
-                        b.textContent.trim().includes('Ablehnen') ||
-                        b.textContent.trim().includes('Alle Akzeptieren')
-                    );
-                    if (btn) btn.click();
-                }
-                ['#cmpwrapper', '#usercentrics-root', '.cmpwrapper'].forEach(sel => {
-                    document.querySelectorAll(sel).forEach(el => el.remove());
-                });
-                document.body.style.overflow = 'auto';
-            }
-        """)
-        time.sleep(2)
-        print("  OK Cookie-Banner entfernt")
-    except Exception as e:
-        print(f"  - Cookie-Banner: {e}")
-
-
-def tippe(page, selector, wert):
-    """Tippt Zeichen fuer Zeichen - aktiviert React/JS Validierung."""
-    locator = page.locator(selector)
-    locator.click()
-    time.sleep(0.2)
-    locator.fill("")
-    for zeichen in wert:
-        locator.press(zeichen)
-        time.sleep(0.05)
-    locator.press("Tab")
-    time.sleep(0.3)
-
-
-def fill_form(page, c):
-    print(f"\nStarte Eintrag fuer: {c['firma']}")
-
-    page.goto("https://services.dasoertliche.de/services/schnupperpaket/sp/")
-    page.wait_for_load_state("networkidle")
-    time.sleep(3)
-
-    cookie_banner_schliessen(page)
-
-    # Grundeintrag waehlen
-    page.wait_for_selector("text=Los geht's", timeout=15000)
-    page.click("text=Los geht's")
-    time.sleep(2)
-    print("  OK Grundeintrag gewaehlt")
-
-    # Schritt 1: Adresse
-    page.wait_for_selector("#companyname", timeout=15000)
-    time.sleep(1)
-
-    # Adresse befuellen - Telefon-Felder werden danach freigeschaltet
-    tippe(page, "#companyname", c["firma"])
-    tippe(page, "#companystreet", c["strasse"])
-    if c["hausnummer"]:
-        tippe(page, "#companyhnr", c["hausnummer"])
-    tippe(page, "#companypc", c["plz"])
-
-    # Ort befuellen und auf Dropdown warten
-    page.locator("#companycity").click()
-    time.sleep(0.2)
-    for zeichen in c["ort"]:
-        page.locator("#companycity").press(zeichen)
-        time.sleep(0.05)
-    time.sleep(1)
-    try:
-        page.locator("#citylist li").first.click(timeout=3000)
-        print("  OK Ort aus Dropdown gewaehlt")
-        time.sleep(1)
-    except PlaywrightTimeout:
-        page.locator("#companycity").press("Tab")
-        print("  - Ort Dropdown nicht erschienen")
-        time.sleep(0.5)
-
-    # Warten bis Telefon-Felder enabled werden
-    print("  Warte auf Freischaltung der Telefon-Felder...")
-    try:
-        page.wait_for_selector("#companytelpre:not([disabled])", timeout=10000)
-        print("  OK Telefon-Felder freigeschaltet")
-    except PlaywrightTimeout:
-        print("  - Telefon-Felder noch disabled, versuche trotzdem...")
-
-    # Telefon befuellen
-    if c["telpre"] and c["telnummer"]:
-        tippe(page, "#companytelpre", c["telpre"])
-        tippe(page, "#companytelnumber", c["telnummer"])
-
-    if c["mobtelpre"] and c["mobtelnummer"]:
-        tippe(page, "#companymobtelpre", c["mobtelpre"])
-        tippe(page, "#companymobtelnumber", c["mobtelnummer"])
-
-    # Optional
-    if c["website"]:
-        tippe(page, "#companyurl", c["website"])
-    if c["email"]:
-        tippe(page, "#companyemail", c["email"])
-    if c["facebook"]:
-        tippe(page, "#socfacebook", c["facebook"])
-    if c["instagram"]:
-        tippe(page, "#socinstagram", c["instagram"])
-
-    # Branche
-    page.locator("#rubric").click()
-    time.sleep(0.2)
-    for zeichen in c["branche"]:
-        page.locator("#rubric").press(zeichen)
-        time.sleep(0.05)
-    time.sleep(2)
-    try:
-        page.locator("#rubriclist li").first.click(timeout=4000)
-        print(f"  OK Branche gewaehlt")
-    except PlaywrightTimeout:
-        page.locator("#rubric").press("Enter")
-        print(f"  - Branche per Enter bestaetigt")
-    time.sleep(0.5)
-
-    page.locator("#SubmitForward").click()
-    time.sleep(2)
-    print("  OK Schritt 1 abgeschlossen")
-
-    # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
-    page.wait_for_selector("text=Schritt 2 von 4", timeout=15000)
-    time.sleep(0.5)
-    page.locator("#SubmitForward").click()
-    time.sleep(2)
-    print("  OK Schritt 2 uebersprungen")
-
-    # Schritt 3: Zahlungsmethoden + Beschreibung
-    page.wait_for_selector("text=Schritt 3 von 4", timeout=15000)
-    time.sleep(0.5)
-    if c["beschreibung"]:
-        page.locator("#freetext").fill(c["beschreibung"][:500])
-        time.sleep(0.3)
-    page.locator("#SubmitForward").click()
-    time.sleep(2)
-    print("  OK Schritt 3 abgeschlossen")
-
-    # Schritt 4: Vorschau + Ansprechpartner
-    page.wait_for_selector("text=Schritt 4 von 4", timeout=15000)
-    time.sleep(1)
-
-    ids4 = page.evaluate("() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null && i.type !== 'hidden' && i.type !== 'submit' && i.type !== 'checkbox').map(i => i.id + '/' + i.name)")
-    print(f"  DEBUG Schritt4 Inputs: {ids4}")
-
-    page.locator("#contactfirstname").fill(c["kontakt_vorname"])
-    time.sleep(0.3)
-    page.locator("#contactlastname").fill(c["kontakt_nachname"])
-    time.sleep(0.3)
-    page.locator("#contactprefixnumber").fill(c["kontakt_telpre"])
-    time.sleep(0.3)
-    page.locator("#contactcallnumber").fill(c["kontakt_telnummer"])
-    time.sleep(0.3)
-    page.locator("#contactemail").fill(c["kontakt_email"])
-    time.sleep(0.5)
-
-    page.locator("#SubmitForward").click()
-    time.sleep(3)
-    print("  OK Eintrag abgesendet!")
-    print(f"\n  E-Mail geht an: {c['kontakt_email']}")
-    print("  Ansprechpartner muss den Link bestaetigen.")
-
-
-def main():
-    print("=" * 55)
-    print("Das Oertliche Automatisierung")
-    print("=" * 55)
-
-    c = get_data()
-
-    try:
-        validiere(c)
-    except ValueError as e:
-        print(f"\nFehler: {e}")
-        exit(1)
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
-        )
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            locale="de-DE"
-        )
-        page = context.new_page()
-
-        try:
-            fill_form(page, c)
-            print("\nErfolgreich abgeschlossen!")
-        except Exception as e:
-            page.screenshot(path="fehler_screenshot.png")
-            print(f"\nFehler: {e}")
-            raise
-        finally:
-            browser.close()
-
-
-if __name__ == "__main__":
+Fehler: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("#companystreet")
+    - locator resolved to <input value="" type="text" id="companystreet" name="companystreet" class="long simple part1  error"/>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+Traceback (most recent call last):
+  File "/home/runner/work/dasoertliche-automation/dasoertliche-automation/dasoertliche_eintrag.py", line 246, in <module>
     main()
+  File "/home/runner/work/dasoertliche-automation/dasoertliche-automation/dasoertliche_eintrag.py", line 235, in main
+    fill_form(page, c)
+  File "/home/runner/work/dasoertliche-automation/dasoertliche-automation/dasoertliche_eintrag.py", line 101, in fill_form
+    tippe(page, "#companystreet", c["strasse"])
+  File "/home/runner/work/dasoertliche-automation/dasoertliche-automation/dasoertliche_eintrag.py", line 70, in tippe
+    locator.click()
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/sync_api/_generated.py", line 15631, in click
+      - done scrolling
+      - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    58 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+
+    self._sync(
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/_impl/_locator.py", line 162, in click
+    return await self._frame._click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/_impl/_frame.py", line 566, in _click
+    await self._channel.send("click", self._timeout, locals_to_params(locals()))
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("#companystreet")
+    - locator resolved to <input value="" type="text" id="companystreet" name="companystreet" class="long simple part1  error"/>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    58 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div id="cmpwrapper" class="cmpwrapper"></div> intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+
+Error: Process completed with exit code 1.
