@@ -140,29 +140,56 @@ def fill_form(page, c):
         tippe(page, "#companyhnr", c["hausnummer"])
     tippe(page, "#companypc", c["plz"])
 
-    # Ort befuellen und auf Dropdown warten
-    page.locator("#companycity").click()
+    # PLZ zuerst - loest Ortssuche aus
+    page.locator("#companypc").click()
     time.sleep(0.2)
-    for zeichen in c["ort"]:
-        page.locator("#companycity").press(zeichen)
-        time.sleep(0.05)
-    time.sleep(1)
+    page.locator("#companypc").fill("")
+    page.keyboard.type(c["plz"], delay=100)
+    time.sleep(2)
+
+    # Ort befuellen und Dropdown abwarten
+    page.locator("#companycity").click()
+    time.sleep(0.3)
+    page.locator("#companycity").fill("")
+    page.keyboard.type(c["ort"], delay=80)
+    time.sleep(2)
+
+    # Dropdown-Eintrag waehlen
     try:
-        page.locator("#citylist li").first.click(timeout=3000)
+        page.wait_for_selector("#citylist li", timeout=5000)
+        page.locator("#citylist li").first.click()
         print("  OK Ort aus Dropdown gewaehlt")
         time.sleep(1)
     except PlaywrightTimeout:
-        page.locator("#companycity").press("Tab")
-        print("  - Ort Dropdown nicht erschienen")
-        time.sleep(0.5)
+        # Fallback: PLZ und Ort nochmal direkt setzen + Enter
+        page.locator("#companypc").fill(c["plz"])
+        time.sleep(0.3)
+        page.locator("#companycity").fill(c["ort"])
+        time.sleep(0.3)
+        page.locator("#companycity").press("Enter")
+        print("  - Ort per Enter bestaetigt")
+        time.sleep(1)
 
-    # Warten bis Telefon-Felder enabled werden
+    # Warten bis Telefon-Felder enabled werden (max 15 Sekunden)
     print("  Warte auf Freischaltung der Telefon-Felder...")
     try:
-        page.wait_for_selector("#companytelpre:not([disabled])", timeout=10000)
+        page.wait_for_selector("#companytelpre:not([disabled])", timeout=15000)
         print("  OK Telefon-Felder freigeschaltet")
     except PlaywrightTimeout:
-        print("  - Telefon-Felder noch disabled, versuche trotzdem...")
+        # Telefon per JavaScript aktivieren
+        print("  - Aktiviere Telefon-Felder per JS...")
+        page.evaluate("""
+            () => {
+                document.querySelectorAll('.part2').forEach(el => {
+                    el.removeAttribute('disabled');
+                    el.classList.remove('disabled');
+                });
+                document.querySelectorAll('.inputwrap.disabled').forEach(el => {
+                    el.classList.remove('disabled');
+                });
+            }
+        """)
+        time.sleep(0.5)
 
     # Telefon befuellen
     if c["telpre"] and c["telnummer"]:
