@@ -238,32 +238,38 @@ def fill_form(page, c):
     page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
     time.sleep(0.3)
     page.evaluate("document.getElementById('SubmitForward').click()")
-    time.sleep(2)
+    time.sleep(3)
+    # cmpwrapper nach Seitenwechsel entfernen
+    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
+    time.sleep(0.5)
     print("  OK Schritt 1 abgeschlossen")
 
     # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
-    page.wait_for_selector("text=Schritt 2 von 4", timeout=15000)
+    page.wait_for_selector("text=Schritt 2 von 4", timeout=20000)
     time.sleep(0.5)
-    page.locator("#SubmitForward").click()
-    time.sleep(2)
+    page.evaluate("document.getElementById('SubmitForward').click()")
+    time.sleep(3)
+    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
+    time.sleep(0.5)
     print("  OK Schritt 2 uebersprungen")
 
     # Schritt 3: Zahlungsmethoden + Beschreibung
-    page.wait_for_selector("text=Schritt 3 von 4", timeout=15000)
+    page.wait_for_selector("text=Schritt 3 von 4", timeout=20000)
     time.sleep(0.5)
     if c["beschreibung"]:
         page.locator("#freetext").fill(c["beschreibung"][:500])
         time.sleep(0.3)
-    page.locator("#SubmitForward").click()
-    time.sleep(2)
+    page.evaluate("document.getElementById('SubmitForward').click()")
+    time.sleep(3)
+    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
+    time.sleep(0.5)
     print("  OK Schritt 3 abgeschlossen")
 
     # Schritt 4: Vorschau + Ansprechpartner
-    page.wait_for_selector("text=Schritt 4 von 4", timeout=15000)
+    page.wait_for_selector("text=Schritt 4 von 4", timeout=20000)
     time.sleep(1)
-
-    ids4 = page.evaluate("() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null && i.type !== 'hidden' && i.type !== 'submit' && i.type !== 'checkbox').map(i => i.id + '/' + i.name)")
-    print(f"  DEBUG Schritt4 Inputs: {ids4}")
+    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
+    time.sleep(0.5)
 
     page.locator("#contactfirstname").fill(c["kontakt_vorname"])
     time.sleep(0.3)
@@ -276,11 +282,14 @@ def fill_form(page, c):
     page.locator("#contactemail").fill(c["kontakt_email"])
     time.sleep(0.5)
 
-    page.locator("#SubmitForward").click()
+    page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
+    time.sleep(0.3)
+    page.evaluate("document.getElementById('SubmitForward').click()")
     time.sleep(3)
     print("  OK Eintrag abgesendet!")
     print(f"\n  E-Mail geht an: {c['kontakt_email']}")
     print("  Ansprechpartner muss den Link bestaetigen.")
+
 
 
 def main():
