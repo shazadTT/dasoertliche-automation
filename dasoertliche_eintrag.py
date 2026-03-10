@@ -200,13 +200,14 @@ def fill_form(page, c):
         tippe(page, "#companymobtelpre", c["mobtelpre"])
         tippe(page, "#companymobtelnumber", c["mobtelnummer"])
 
-    # Optional
+    # Optional - Website
     if c["website"]:
         tippe(page, "#companyurl", c["website"])
-    # E-Mail: Kontakt-Email als Fallback verwenden
+
+    # E-Mail - Pflichtfeld, nach Telefon befuellen (erst dann ist es enabled)
     email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
-    page.evaluate("(v) => { const el = document.getElementById('companyemail'); if(el){el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); el.dispatchEvent(new Event('blur',{bubbles:true})); } }", email_fuer_formular)
-    time.sleep(0.3)
+    tippe(page, "#companyemail", email_fuer_formular)
+
     if c["facebook"]:
         tippe(page, "#socfacebook", c["facebook"])
     if c["instagram"]:
@@ -223,7 +224,6 @@ def fill_form(page, c):
         page.locator("#rubriclist li").first.click()
         print(f"  OK Branche aus Dropdown gewaehlt")
     except PlaywrightTimeout:
-        # Fallback: rubricid direkt setzen
         branche_val = c["branche"].replace("'", "\'")
         page.evaluate(f"""
             () => {{
@@ -235,26 +235,26 @@ def fill_form(page, c):
         print(f"  - Branche per JS gesetzt")
     time.sleep(0.5)
 
-    # E-Mail Fehler prüfen und Feld leeren falls ungültig
-    fehler = page.evaluate("() => { const el = document.querySelector('.uups, [class*=error], [class*=fehler]'); return el ? el.textContent : ''; }")
-    if 'E-Mail' in str(fehler):
-        print("  - E-Mail ungueltig, Feld wird geleert")
-        page.evaluate("() => { const el = document.getElementById('companyemail'); if(el) el.value = ''; }")
+    # Weiter - erst normaler Klick versuchen, dann JS-Fallback
+    try:
+        page.locator("#SubmitForward:not([disabled])").click(timeout=5000)
+        print("  OK Weiter geklickt")
+    except PlaywrightTimeout:
+        # Formular-Fehler ausgeben fuer Debug
+        fehler = page.evaluate("() => { const el = document.querySelector('.uups .message p'); return el ? el.textContent : 'kein Fehler'; }")
+        print(f"  DEBUG Formular-Fehler: {fehler}")
+        # Trotzdem per JS weiter
+        page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
         time.sleep(0.3)
-
-    # Weiter-Button per JavaScript klicken (umgeht disabled-Check)
-    page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
-    time.sleep(0.3)
-    page.evaluate("document.getElementById('SubmitForward').click()")
+        page.evaluate("document.getElementById('SubmitForward').click()")
     time.sleep(3)
-    # cmpwrapper nach Seitenwechsel entfernen
     page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
     time.sleep(0.5)
 
-    # Prüfen ob wir wirklich auf Schritt 2 sind oder noch Fehler haben
-    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent : ''")
+    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
     print(f"  DEBUG aktuelle Seite: {aktuell}")
     print("  OK Schritt 1 abgeschlossen")
+
 
 
     # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
