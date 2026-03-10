@@ -1,10 +1,3 @@
-"""
-Das Örtliche – Automatischer Firmeneintrag
-==========================================
-Wird von GitHub Actions aufgerufen.
-Empfängt Kundendaten als Umgebungsvariablen (kommen von Zapier).
-"""
-
 import os
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
@@ -12,26 +5,26 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 def get_data():
     return {
-        "firma":            os.environ.get("FIRMA", ""),
-        "strasse":          os.environ.get("STRASSE", ""),
-        "hausnummer":       os.environ.get("HAUSNUMMER", ""),
-        "plz":              os.environ.get("PLZ", ""),
-        "ort":              os.environ.get("ORT", ""),
-        "telpre":           os.environ.get("TELPRE", ""),
-        "telnummer":        os.environ.get("TELNUMMER", ""),
-        "mobtelpre":        os.environ.get("MOBTELPRE", ""),
-        "mobtelnummer":     os.environ.get("MOBTELNUMMER", ""),
-        "email":            os.environ.get("EMAIL", ""),
-        "website":          os.environ.get("WEBSITE", ""),
-        "facebook":         os.environ.get("FACEBOOK", ""),
-        "instagram":        os.environ.get("INSTAGRAM", ""),
-        "branche":          os.environ.get("BRANCHE", ""),
-        "beschreibung":     os.environ.get("BESCHREIBUNG", ""),
-        "kontakt_vorname":  os.environ.get("KONTAKT_VORNAME", ""),
-        "kontakt_nachname": os.environ.get("KONTAKT_NACHNAME", ""),
-        "kontakt_telpre":   os.environ.get("KONTAKT_TELPRE", ""),
-        "kontakt_telnummer":os.environ.get("KONTAKT_TELNUMMER", ""),
-        "kontakt_email":    os.environ.get("KONTAKT_EMAIL", ""),
+        "firma":             os.environ.get("FIRMA", ""),
+        "strasse":           os.environ.get("STRASSE", ""),
+        "hausnummer":        os.environ.get("HAUSNUMMER", ""),
+        "plz":               os.environ.get("PLZ", ""),
+        "ort":               os.environ.get("ORT", ""),
+        "telpre":            os.environ.get("TELPRE", ""),
+        "telnummer":         os.environ.get("TELNUMMER", ""),
+        "mobtelpre":         os.environ.get("MOBTELPRE", ""),
+        "mobtelnummer":      os.environ.get("MOBTELNUMMER", ""),
+        "email":             os.environ.get("EMAIL", ""),
+        "website":           os.environ.get("WEBSITE", ""),
+        "facebook":          os.environ.get("FACEBOOK", ""),
+        "instagram":         os.environ.get("INSTAGRAM", ""),
+        "branche":           os.environ.get("BRANCHE", ""),
+        "beschreibung":      os.environ.get("BESCHREIBUNG", ""),
+        "kontakt_vorname":   os.environ.get("KONTAKT_VORNAME", ""),
+        "kontakt_nachname":  os.environ.get("KONTAKT_NACHNAME", ""),
+        "kontakt_telpre":    os.environ.get("KONTAKT_TELPRE", ""),
+        "kontakt_telnummer": os.environ.get("KONTAKT_TELNUMMER", ""),
+        "kontakt_email":     os.environ.get("KONTAKT_EMAIL", ""),
     }
 
 
@@ -66,36 +59,32 @@ def cookie_banner_schliessen(page):
             }
         """)
         time.sleep(2)
-        print("  ✓ Cookie-Banner entfernt")
+        print("  OK Cookie-Banner entfernt")
     except Exception as e:
-        print(f"  – Cookie-Banner: {e}")
+        print(f"  - Cookie-Banner: {e}")
 
 
 def fill_form(page, c):
-    print(f"\n🚀 Starte Eintrag für: {c['firma']}")
+    print(f"\nStarte Eintrag fuer: {c['firma']}")
 
-    # Startseite laden
     page.goto("https://services.dasoertliche.de/services/schnupperpaket/sp/")
     page.wait_for_load_state("networkidle")
     time.sleep(3)
 
     cookie_banner_schliessen(page)
 
-    # Grundeintrag wählen
     page.wait_for_selector("text=Los geht's", timeout=15000)
     page.click("text=Los geht's")
     time.sleep(2)
-    print("  ✓ Grundeintrag gewählt")
+    print("  OK Grundeintrag gewaehlt")
 
-    # ── SCHRITT 1: Adresse + Kontakt + Branche ──────────────────────────────
+    # Schritt 1: Adresse + Kontakt + Branche
     page.wait_for_selector("#companyname", timeout=15000)
     time.sleep(1)
 
-    # Debug: alle sichtbaren Inputs ausgeben
     ids = page.evaluate("() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null).map(i => i.id + '/' + i.name)")
     print(f"  DEBUG Schritt1 Inputs: {ids}")
 
-    # Adresse
     page.locator("#companyname").fill(c["firma"])
     time.sleep(0.3)
     page.locator("#companystreet").fill(c["strasse"])
@@ -107,28 +96,24 @@ def fill_form(page, c):
     time.sleep(0.5)
     page.locator("#companycity").fill(c["ort"])
     time.sleep(1)
-    # Ort aus Dropdown wählen falls erscheint
     try:
         page.locator("#citylist li").first.click(timeout=3000)
         time.sleep(0.5)
     except PlaywrightTimeout:
         pass
 
-    # Telefon - Festnetz
     if c["telpre"] and c["telnummer"]:
         page.locator("#companytelpre").fill(c["telpre"])
         time.sleep(0.3)
         page.locator("#companytelnumber").fill(c["telnummer"])
         time.sleep(0.3)
 
-    # Telefon - Mobil
     if c["mobtelpre"] and c["mobtelnummer"]:
         page.locator("#companymobtelpre").fill(c["mobtelpre"])
         time.sleep(0.3)
         page.locator("#companymobtelnumber").fill(c["mobtelnummer"])
         time.sleep(0.3)
 
-    # Optional
     if c["website"]:
         page.locator("#companyurl").fill(c["website"])
         time.sleep(0.3)
@@ -142,30 +127,28 @@ def fill_form(page, c):
         page.locator("#socinstagram").fill(c["instagram"])
         time.sleep(0.3)
 
-    # Branche
     page.locator("#rubric").fill(c["branche"])
     time.sleep(2)
     try:
         page.locator("#rubriclist li").first.click(timeout=4000)
-        print(f"  ✓ Branche aus Dropdown gewählt")
+        print(f"  OK Branche aus Dropdown gewaehlt")
     except PlaywrightTimeout:
-        print(f"  – Branche Dropdown nicht erschienen, Enter drücken")
+        print(f"  - Branche Dropdown nicht erschienen, Enter druecken")
         page.locator("#rubric").press("Enter")
     time.sleep(0.5)
 
-    # Weiter klicken
     page.locator("#SubmitForward").click()
     time.sleep(2)
-    print("  ✓ Schritt 1 – Adresse + Kontakt + Branche")
+    print("  OK Schritt 1 abgeschlossen")
 
-    # ── SCHRITT 2: Öffnungszeiten + Logo (überspringen) ────────────────────
+    # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
     page.wait_for_selector("text=Schritt 2 von 4", timeout=15000)
     time.sleep(0.5)
     page.locator("#SubmitForward").click()
     time.sleep(2)
-    print("  ✓ Schritt 2 – Öffnungszeiten übersprungen")
+    print("  OK Schritt 2 uebersprungen")
 
-    # ── SCHRITT 3: Zahlungsmethoden + Beschreibung ─────────────────────────
+    # Schritt 3: Zahlungsmethoden + Beschreibung
     page.wait_for_selector("text=Schritt 3 von 4", timeout=15000)
     time.sleep(0.5)
     if c["beschreibung"]:
@@ -173,13 +156,12 @@ def fill_form(page, c):
         time.sleep(0.3)
     page.locator("#SubmitForward").click()
     time.sleep(2)
-    print("  ✓ Schritt 3 – Zahlungsmethoden + Beschreibung")
+    print("  OK Schritt 3 abgeschlossen")
 
-    # ── SCHRITT 4: Vorschau + Ansprechpartner ──────────────────────────────
+    # Schritt 4: Vorschau + Ansprechpartner
     page.wait_for_selector("text=Schritt 4 von 4", timeout=15000)
     time.sleep(1)
 
-    # Debug Step 4
     ids4 = page.evaluate("() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null && i.type !== 'hidden' && i.type !== 'submit' && i.type !== 'checkbox').map(i => i.id + '/' + i.name)")
     print(f"  DEBUG Schritt4 Inputs: {ids4}")
 
@@ -194,17 +176,16 @@ def fill_form(page, c):
     page.locator("#contactemail").fill(c["kontakt_email"])
     time.sleep(0.5)
 
-    # Absenden
     page.locator("#SubmitForward").click()
     time.sleep(3)
-    print("  ✓ Schritt 4 – Eintrag abgesendet!")
-    print(f"\n  📧 Bestätigungsmail geht an: {c['kontakt_email']}")
-    print("  ℹ️  Ansprechpartner muss den Link in der E-Mail bestätigen.")
+    print("  OK Eintrag abgesendet!")
+    print(f"\n  E-Mail geht an: {c['kontakt_email']}")
+    print("  Ansprechpartner muss den Link bestaetigen.")
 
 
 def main():
     print("=" * 55)
-    print("Das Örtliche Automatisierung")
+    print("Das Oertliche Automatisierung")
     print("=" * 55)
 
     c = get_data()
@@ -212,7 +193,7 @@ def main():
     try:
         validiere(c)
     except ValueError as e:
-        print(f"\n❌ Fehler: {e}")
+        print(f"\nFehler: {e}")
         exit(1)
 
     with sync_playwright() as p:
@@ -228,10 +209,10 @@ def main():
 
         try:
             fill_form(page, c)
-            print("\n✅ Erfolgreich abgeschlossen!")
+            print("\nErfolgreich abgeschlossen!")
         except Exception as e:
             page.screenshot(path="fehler_screenshot.png")
-            print(f"\n❌ Fehler: {e}")
+            print(f"\nFehler: {e}")
             raise
         finally:
             browser.close()
@@ -239,44 +220,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
-
-Commit: **"Add script"**
-
----
-
-### Schritt 3: Zapier einrichten
-
-Genau wie bei Gelbe Seiten – nur die URL ändern:
-```
-URL: https://api.github.com/repos/USERNAME/dasoertliche-automation/actions/workflows/dasoertliche.yml/dispatches
-
-Headers:
-  Authorization: Bearer DEIN_GITHUB_TOKEN
-  Accept: application/vnd.github.v3+json
-  Content-Type: application/json
-
-Payload Type: Json
-
-Felder:
-  ref → main
-  inputs__firma → HubSpot Company Name
-  inputs__strasse → HubSpot Street
-  inputs__hausnummer → HubSpot Hausnummer
-  inputs__plz → HubSpot Postal Code
-  inputs__ort → HubSpot City
-  inputs__telpre → z.B. "0511" (statisch oder aus HubSpot)
-  inputs__telnummer → HubSpot Phone
-  inputs__mobtelpre → HubSpot Mobil Vorwahl
-  inputs__mobtelnummer → HubSpot Mobil Nummer
-  inputs__email → HubSpot Email
-  inputs__website → HubSpot Website
-  inputs__facebook → HubSpot Facebook
-  inputs__instagram → HubSpot Instagram
-  inputs__branche → HubSpot Branche
-  inputs__beschreibung → HubSpot Description
-  inputs__kontakt_vorname → Max (statisch)
-  inputs__kontakt_nachname → Mustermann (statisch)
-  inputs__kontakt_telpre → 0511 (statisch)
-  inputs__kontakt_telnummer → 123456 (statisch)
-  inputs__kontakt_email → eintrag@agentur.de (statisch)
