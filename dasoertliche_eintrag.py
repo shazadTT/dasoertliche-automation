@@ -75,15 +75,14 @@ def cookie_banner_schliessen(page):
 
 
 def tippe(page, selector, wert):
-    """Tippt Zeichen fuer Zeichen - aktiviert React/JS Validierung."""
+    """Tippt Text ein und loest JS-Validierung aus."""
     locator = page.locator(selector)
     locator.click()
     time.sleep(0.2)
     locator.fill("")
-    for zeichen in wert:
-        locator.press(zeichen)
-        time.sleep(0.05)
-    locator.press("Tab")
+    # type() unterstuetzt Sonderzeichen wie ae, oe, ue, ss
+    page.keyboard.type(wert, delay=50)
+    page.keyboard.press("Tab")
     time.sleep(0.3)
 
 
