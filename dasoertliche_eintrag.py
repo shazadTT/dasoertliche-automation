@@ -204,7 +204,9 @@ def fill_form(page, c):
     if c["website"]:
         tippe(page, "#companyurl", c["website"])
     if c["email"]:
-        tippe(page, "#companyemail", c["email"])
+        email_val = c["email"]
+        page.evaluate("(v) => { const el = document.getElementById('companyemail'); if(el){el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); el.dispatchEvent(new Event('blur',{bubbles:true})); } }", email_val)
+        time.sleep(0.3)
     if c["facebook"]:
         tippe(page, "#socfacebook", c["facebook"])
     if c["instagram"]:
