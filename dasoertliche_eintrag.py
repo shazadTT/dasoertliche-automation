@@ -203,10 +203,10 @@ def fill_form(page, c):
     # Optional
     if c["website"]:
         tippe(page, "#companyurl", c["website"])
-    if c["email"]:
-        email_val = c["email"]
-        page.evaluate("(v) => { const el = document.getElementById('companyemail'); if(el){el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); el.dispatchEvent(new Event('blur',{bubbles:true})); } }", email_val)
-        time.sleep(0.3)
+    # E-Mail: Kontakt-Email als Fallback verwenden
+    email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
+    page.evaluate("(v) => { const el = document.getElementById('companyemail'); if(el){el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); el.dispatchEvent(new Event('blur',{bubbles:true})); } }", email_fuer_formular)
+    time.sleep(0.3)
     if c["facebook"]:
         tippe(page, "#socfacebook", c["facebook"])
     if c["instagram"]:
@@ -235,6 +235,12 @@ def fill_form(page, c):
         print(f"  - Branche per JS gesetzt")
     time.sleep(0.5)
 
+    # E-Mail Fehler prüfen und Feld leeren falls ungültig
+    fehler = page.evaluate("() => { const el = document.querySelector('.uups, [class*=error], [class*=fehler]'); return el ? el.textContent : ''; }")
+    if 'E-Mail' in str(fehler):
+        print("  - E-Mail ungueltig, Feld wird geleert")
+        page.evaluate("() => { const el = document.getElementById('companyemail'); if(el) el.value = ''; }")
+        time.sleep(0.3)
 
     # Weiter-Button per JavaScript klicken (umgeht disabled-Check)
     page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
@@ -244,7 +250,12 @@ def fill_form(page, c):
     # cmpwrapper nach Seitenwechsel entfernen
     page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
     time.sleep(0.5)
+
+    # Prüfen ob wir wirklich auf Schritt 2 sind oder noch Fehler haben
+    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent : ''")
+    print(f"  DEBUG aktuelle Seite: {aktuell}")
     print("  OK Schritt 1 abgeschlossen")
+
 
     # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
     page.wait_for_selector("text=Schritt 2 von 4", timeout=20000)
