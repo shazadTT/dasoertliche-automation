@@ -234,16 +234,20 @@ def fill_form(page, c):
         """)
         print(f"  - Branche per JS gesetzt")
     time.sleep(0.5)
+    # Ausführlicher Debug vor Submit
+    email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value + ' (disabled:' + el.disabled + ')' : 'nicht gefunden'; }")
+    print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
+    alle_fehler = page.evaluate("() => Array.from(document.querySelectorAll('.uups p, .error-message, [class*=uups]')).map(e => e.textContent.trim()).join(' | ')")
+    print(f"  DEBUG alle Fehler: {alle_fehler}")
+    submit_status = page.evaluate("() => { const el = document.getElementById('SubmitForward'); return el ? 'disabled:' + el.disabled : 'nicht gefunden'; }")
+    print(f"  DEBUG Submit: {submit_status}")
 
     # Weiter - erst normaler Klick versuchen, dann JS-Fallback
     try:
         page.locator("#SubmitForward:not([disabled])").click(timeout=5000)
         print("  OK Weiter geklickt")
     except PlaywrightTimeout:
-        # Formular-Fehler ausgeben fuer Debug
-        fehler = page.evaluate("() => { const el = document.querySelector('.uups .message p'); return el ? el.textContent : 'kein Fehler'; }")
-        print(f"  DEBUG Formular-Fehler: {fehler}")
-        # Trotzdem per JS weiter
+        print("  - Weiter disabled, versuche JS-Klick")
         page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
         time.sleep(0.3)
         page.evaluate("document.getElementById('SubmitForward').click()")
