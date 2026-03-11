@@ -200,7 +200,7 @@ def fill_form(page, c):
         tippe(page, "#companymobtelpre", c["mobtelpre"])
         tippe(page, "#companymobtelnumber", c["mobtelnummer"])
 
-    # Optional - Website
+    # Website + Social Media
     if c["website"]:
         tippe(page, "#companyurl", c["website"])
     if c["facebook"]:
@@ -208,7 +208,15 @@ def fill_form(page, c):
     if c["instagram"]:
         tippe(page, "#socinstagram", c["instagram"])
 
-    # Branche - keyboard.type fuer Sonderzeichen, dann Dropdown
+    # E-Mail (optional aber Pflicht wenn sichtbar) - vor Branche
+    email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
+    page.locator("#companyemail").click()
+    time.sleep(0.3)
+    page.locator("#companyemail").fill("")
+    page.keyboard.type(email_fuer_formular, delay=50)
+    time.sleep(0.5)
+
+    # Branche zuletzt - laut Formular-Reihenfolge
     page.locator("#rubric").click()
     time.sleep(0.2)
     page.locator("#rubric").fill("")
@@ -230,13 +238,7 @@ def fill_form(page, c):
         print(f"  - Branche per JS gesetzt")
     time.sleep(1)
 
-    # E-Mail zuletzt befuellen - kein Tab danach
-    email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
-    page.locator("#companyemail").click()
-    time.sleep(0.3)
-    page.locator("#companyemail").fill("")
-    page.keyboard.type(email_fuer_formular, delay=50)
-    time.sleep(1)
+    # Debug E-Mail
     email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
     print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
 
@@ -247,11 +249,14 @@ def fill_form(page, c):
     time.sleep(4)
     page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
     time.sleep(0.5)
+
+    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
     fehler_nach = page.evaluate("() => { const el = document.querySelector('.uups'); return el ? el.textContent.trim() : ''; }")
     print(f"  DEBUG aktuelle Seite: {aktuell}")
     if fehler_nach:
         print(f"  DEBUG Fehler nach Submit: {fehler_nach[:100]}")
     print("  OK Schritt 1 abgeschlossen")
+
 
 
 
