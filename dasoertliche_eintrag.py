@@ -240,13 +240,13 @@ def fill_form(page, c):
     email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
     print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
 
-    # Submit per form.submit() - umgeht Button-Validierung
-    page.evaluate("() => { document.querySelector('form').submit(); }")
+    # Scroll zum weiter-Button und klicken
+    page.locator("#SubmitForward").scroll_into_view_if_needed()
+    time.sleep(0.5)
+    page.locator("#SubmitForward").click()
     time.sleep(4)
     page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
     time.sleep(0.5)
-
-    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
     fehler_nach = page.evaluate("() => { const el = document.querySelector('.uups'); return el ? el.textContent.trim() : ''; }")
     print(f"  DEBUG aktuelle Seite: {aktuell}")
     if fehler_nach:
