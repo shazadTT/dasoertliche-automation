@@ -203,11 +203,6 @@ def fill_form(page, c):
     # Optional - Website
     if c["website"]:
         tippe(page, "#companyurl", c["website"])
-
-    # E-Mail - Pflichtfeld, nach Telefon befuellen (erst dann ist es enabled)
-    email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
-    tippe(page, "#companyemail", email_fuer_formular)
-
     if c["facebook"]:
         tippe(page, "#socfacebook", c["facebook"])
     if c["instagram"]:
@@ -233,31 +228,31 @@ def fill_form(page, c):
             }}
         """)
         print(f"  - Branche per JS gesetzt")
-    time.sleep(0.5)
-    # Ausführlicher Debug vor Submit
-    email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value + ' (disabled:' + el.disabled + ')' : 'nicht gefunden'; }")
-    print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
-    alle_fehler = page.evaluate("() => Array.from(document.querySelectorAll('.uups p, .error-message, [class*=uups]')).map(e => e.textContent.trim()).join(' | ')")
-    print(f"  DEBUG alle Fehler: {alle_fehler}")
-    submit_status = page.evaluate("() => { const el = document.getElementById('SubmitForward'); return el ? 'disabled:' + el.disabled : 'nicht gefunden'; }")
-    print(f"  DEBUG Submit: {submit_status}")
+    time.sleep(1)
 
-    # Weiter - erst normaler Klick versuchen, dann JS-Fallback
-    try:
-        page.locator("#SubmitForward:not([disabled])").click(timeout=5000)
-        print("  OK Weiter geklickt")
-    except PlaywrightTimeout:
-        print("  - Weiter disabled, versuche JS-Klick")
-        page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
-        time.sleep(0.3)
-        page.evaluate("document.getElementById('SubmitForward').click()")
-    time.sleep(3)
+    # E-Mail zuletzt befuellen - kein Tab danach
+    email_fuer_formular = c["email"] if c["email"] else c["kontakt_email"]
+    page.locator("#companyemail").click()
+    time.sleep(0.3)
+    page.locator("#companyemail").fill("")
+    page.keyboard.type(email_fuer_formular, delay=50)
+    time.sleep(1)
+    email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
+    print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
+
+    # Submit per form.submit() - umgeht Button-Validierung
+    page.evaluate("() => { document.querySelector('form').submit(); }")
+    time.sleep(4)
     page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
     time.sleep(0.5)
 
     aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
+    fehler_nach = page.evaluate("() => { const el = document.querySelector('.uups'); return el ? el.textContent.trim() : ''; }")
     print(f"  DEBUG aktuelle Seite: {aktuell}")
+    if fehler_nach:
+        print(f"  DEBUG Fehler nach Submit: {fehler_nach[:100]}")
     print("  OK Schritt 1 abgeschlossen")
+
 
 
 
