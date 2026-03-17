@@ -40,7 +40,6 @@ def validiere(c):
 
 
 def cookie_banner_schliessen(page):
-    # Schritt 1: Button klicken falls sichtbar
     try:
         page.wait_for_selector("button:has-text('Ablehnen')", timeout=6000)
         page.click("button:has-text('Ablehnen')")
@@ -55,7 +54,6 @@ def cookie_banner_schliessen(page):
         except PlaywrightTimeout:
             print("  - Kein Cookie-Button gefunden")
 
-    # Schritt 2: cmpwrapper IMMER aus DOM entfernen (blockiert sonst Klicks)
     page.evaluate("""
         () => {
             const selectors = [
@@ -80,7 +78,6 @@ def tippe(page, selector, wert):
     locator.click()
     time.sleep(0.2)
     locator.fill("")
-    # type() unterstuetzt Sonderzeichen wie ae, oe, ue, ss
     page.keyboard.type(wert, delay=50)
     page.keyboard.press("Tab")
     time.sleep(0.3)
@@ -101,30 +98,21 @@ def fill_form(page, c):
     time.sleep(2)
     print("  OK Grundeintrag gewaehlt")
 
-    # Schritt 1: Adresse
+    # Schritt 1: Formulardaten
     page.wait_for_selector("#companyname", timeout=15000)
     time.sleep(1)
 
-    # cmpwrapper nochmal entfernen - wird nach Seitennavigation neu geladen
+    # cmpwrapper entfernen + MutationObserver
     page.evaluate("""
         () => {
             document.querySelectorAll('#cmpwrapper, .cmpwrapper, [id*="cmp"]')
                 .forEach(el => el.remove());
             document.body.style.overflow = 'auto';
-        }
-    """)
-    # MutationObserver: verhindert dass cmpwrapper wieder erscheint
-    page.evaluate("""
-        () => {
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     mutation.addedNodes.forEach((node) => {
-                        if (node.id && node.id.includes('cmp')) {
-                            node.remove();
-                        }
-                        if (node.className && typeof node.className === 'string' && node.className.includes('cmp')) {
-                            node.remove();
-                        }
+                        if (node.id && node.id.includes('cmp')) node.remove();
+                        if (node.className && typeof node.className === 'string' && node.className.includes('cmp')) node.remove();
                     });
                 });
             });
@@ -133,19 +121,15 @@ def fill_form(page, c):
     """)
     time.sleep(0.5)
 
-    # Adresse befuellen - Telefon-Felder werden danach freigeschaltet
     tippe(page, "#companyname", c["firma"])
     tippe(page, "#companystreet", c["strasse"])
     if c["hausnummer"]:
         tippe(page, "#companyhnr", c["hausnummer"])
-    tippe(page, "#companypc", c["plz"])
 
-    # PLZ zuerst - loest Ortssuche aus
-    page.locator("#companypc").click()
-    time.sleep(0.2)
-    page.locator("#companypc").fill("")
-    page.keyboard.type(c["plz"], delay=100)
-    time.sleep(2)
+    # PLZ einmal befüllen – tippe() drückt Tab und triggert AJAX-Validierung
+    # KEIN zweites Fill danach, das würde die Validierung zurücksetzen
+    tippe(page, "#companypc", c["plz"])
+    time.sleep(2)  # AJAX-Validierung abwarten
 
     # Ort befuellen und Dropdown abwarten
     page.locator("#companycity").click()
@@ -154,29 +138,22 @@ def fill_form(page, c):
     page.keyboard.type(c["ort"], delay=80)
     time.sleep(2)
 
-    # Dropdown-Eintrag waehlen
     try:
         page.wait_for_selector("#citylist li", timeout=5000)
         page.locator("#citylist li").first.click()
         print("  OK Ort aus Dropdown gewaehlt")
         time.sleep(1)
     except PlaywrightTimeout:
-        # Fallback: PLZ und Ort nochmal direkt setzen + Enter
-        page.locator("#companypc").fill(c["plz"])
-        time.sleep(0.3)
-        page.locator("#companycity").fill(c["ort"])
-        time.sleep(0.3)
         page.locator("#companycity").press("Enter")
         print("  - Ort per Enter bestaetigt")
         time.sleep(1)
 
-    # Warten bis Telefon-Felder enabled werden (max 15 Sekunden)
+    # Warten bis Telefon-Felder enabled werden
     print("  Warte auf Freischaltung der Telefon-Felder...")
     try:
         page.wait_for_selector("#companytelpre:not([disabled])", timeout=15000)
         print("  OK Telefon-Felder freigeschaltet")
     except PlaywrightTimeout:
-        # Telefon per JavaScript aktivieren
         print("  - Aktiviere Telefon-Felder per JS...")
         page.evaluate("""
             () => {
@@ -191,7 +168,7 @@ def fill_form(page, c):
         """)
         time.sleep(0.5)
 
-    # Telefon befuellen
+    # Telefon
     if c["telpre"] and c["telnummer"]:
         tippe(page, "#companytelpre", c["telpre"])
         tippe(page, "#companytelnumber", c["telnummer"])
@@ -208,15 +185,13 @@ def fill_form(page, c):
     if c["instagram"]:
         tippe(page, "#socinstagram", c["instagram"])
 
-    # E-Mail (optional aber Pflicht wenn sichtbar) - vor Branche
-    # E-Mail Feld wird leer gelassen - Das Oertliche validiert zu streng
+    # E-Mail
+    if c.get("email"):
+        tippe(page, "#companyemail", c["email"])
+        email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
+        print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
 
-
-
-
-
-
-    # Branche zuletzt - laut Formular-Reihenfolge
+    # Branche
     page.locator("#rubric").click()
     time.sleep(0.2)
     page.locator("#rubric").fill("")
@@ -225,9 +200,9 @@ def fill_form(page, c):
     try:
         page.wait_for_selector("#rubriclist li", timeout=4000)
         page.locator("#rubriclist li").first.click()
-        print(f"  OK Branche aus Dropdown gewaehlt")
+        print("  OK Branche aus Dropdown gewaehlt")
     except PlaywrightTimeout:
-        branche_val = c["branche"].replace("'", "\'")
+        branche_val = c["branche"].replace("'", "\\'")
         page.evaluate(f"""
             () => {{
                 document.getElementById('rubric').value = '{branche_val}';
@@ -235,14 +210,35 @@ def fill_form(page, c):
                 if (rubricid) rubricid.value = '0000001';
             }}
         """)
-        print(f"  - Branche per JS gesetzt")
+        print("  - Branche per JS gesetzt")
     time.sleep(1)
 
-    # Debug E-Mail
-    email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
-    print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
+    # Debug: PLZ-Validierungsstatus prüfen
+    plz_valid = page.evaluate("""
+        () => {
+            const el = document.getElementById('companypc');
+            if (!el) return 'nicht gefunden';
+            return {
+                value: el.value,
+                classes: el.className,
+                disabled: el.disabled
+            };
+        }
+    """)
+    print(f"  DEBUG PLZ-Status: {plz_valid}")
 
-    # Scroll zum weiter-Button und klicken
+    # Weiter-Button per JS aktivieren falls PLZ-Validierung hängt
+    page.evaluate("""
+        () => {
+            const btn = document.getElementById('SubmitForward');
+            if (btn && btn.disabled) {
+                // Validierungsfehler prüfen
+                const errors = document.querySelectorAll('.error, .invalid, [class*="error"]');
+                console.log('Fehler gefunden:', errors.length);
+            }
+        }
+    """)
+
     page.locator("#SubmitForward").scroll_into_view_if_needed()
     time.sleep(0.5)
     page.locator("#SubmitForward").click()
@@ -251,15 +247,8 @@ def fill_form(page, c):
     time.sleep(0.5)
 
     aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
-    fehler_nach = page.evaluate("() => { const el = document.querySelector('.uups'); return el ? el.textContent.trim() : ''; }")
-    print(f"  DEBUG aktuelle Seite: {aktuell}")
-    if fehler_nach:
-        print(f"  DEBUG Fehler nach Submit: {fehler_nach[:100]}")
+    print(f"  DEBUG aktuelle Seite nach Submit: {aktuell}")
     print("  OK Schritt 1 abgeschlossen")
-
-
-
-
 
     # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
     page.wait_for_selector("text=Schritt 2 von 4", timeout=20000)
@@ -306,7 +295,6 @@ def fill_form(page, c):
     print("  OK Eintrag abgesendet!")
     print(f"\n  E-Mail geht an: {c['kontakt_email']}")
     print("  Ansprechpartner muss den Link bestaetigen.")
-
 
 
 def main():
