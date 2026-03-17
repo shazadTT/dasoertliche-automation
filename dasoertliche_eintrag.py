@@ -126,10 +126,43 @@ def fill_form(page, c):
     if c["hausnummer"]:
         tippe(page, "#companyhnr", c["hausnummer"])
 
-    # PLZ einmal befüllen – tippe() drückt Tab und triggert AJAX-Validierung
-    # KEIN zweites Fill danach, das würde die Validierung zurücksetzen
-    tippe(page, "#companypc", c["plz"])
-    time.sleep(2)  # AJAX-Validierung abwarten
+    # PLZ befuellen und aus Dropdown auswaehlen (AJAX erfordert Dropdown-Klick)
+    page.locator("#companypc").click()
+    time.sleep(0.2)
+    page.locator("#companypc").fill("")
+    page.keyboard.type(c["plz"], delay=100)
+    time.sleep(2)
+    try:
+        page.wait_for_selector("#pclist li, #citylist li", timeout=5000)
+        plz_items = page.locator("#pclist li")
+        city_items = page.locator("#citylist li")
+        if plz_items.count() > 0:
+            plz_items.first.click()
+            print("  OK PLZ aus Dropdown (pclist)")
+        elif city_items.count() > 0:
+            city_items.first.click()
+            print("  OK PLZ/Ort aus kombiniertem Dropdown")
+        time.sleep(1)
+    except PlaywrightTimeout:
+        page.locator("#companypc").press("Tab")
+        print("  - PLZ per Tab (kein Dropdown)")
+        time.sleep(1)
+
+    # PLZ-Error-Klasse per JS entfernen falls noch gesetzt
+    plz_klassen = page.evaluate("() => { const el = document.getElementById('companypc'); return el ? el.className : ''; }")
+    if "error" in plz_klassen:
+        print(f"  WARN PLZ im Error-State: {plz_klassen} - JS-Fix")
+        page.evaluate("""
+            () => {
+                const el = document.getElementById('companypc');
+                if (el) {
+                    el.classList.remove('error');
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    el.dispatchEvent(new Event('blur', {bubbles: true}));
+                }
+            }
+        """)
+        time.sleep(0.5)
 
     # Ort befuellen und Dropdown abwarten
     page.locator("#companycity").click()
