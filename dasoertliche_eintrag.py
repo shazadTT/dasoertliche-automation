@@ -2,6 +2,11 @@ import os
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
+FREEMAIL = [
+    "gmail", "gmx", "web.de", "yahoo", "hotmail", "outlook",
+    "icloud", "t-online", "freenet", "mailbox", "aol", "proton"
+]
+
 
 def get_data():
     return {
@@ -39,48 +44,110 @@ def validiere(c):
         raise ValueError("Mindestens Festnetz-Vorwahl oder Mobil-Vorwahl erforderlich")
 
 
-def cookie_banner_schliessen(page):
-    try:
-        page.wait_for_selector("button:has-text('Ablehnen')", timeout=6000)
-        page.click("button:has-text('Ablehnen')")
-        time.sleep(1.5)
-        print("  OK Cookie-Banner per Button abgelehnt")
-    except PlaywrightTimeout:
-        try:
-            page.wait_for_selector("button:has-text('Alle Akzeptieren')", timeout=3000)
-            page.click("button:has-text('Alle Akzeptieren')")
-            time.sleep(1.5)
-            print("  OK Cookie-Banner akzeptiert")
-        except PlaywrightTimeout:
-            print("  - Kein Cookie-Button gefunden")
+def ist_freemail(email):
+    return any(f in email.lower() for f in FREEMAIL)
 
+
+def cmp_entfernen(page):
     page.evaluate("""
         () => {
-            const selectors = [
-                '#cmpwrapper', '.cmpwrapper',
-                '#usercentrics-root',
-                '[id*="cmp"]', '[class*="cmpwrap"]'
-            ];
-            selectors.forEach(sel => {
+            ['#cmpwrapper', '.cmpwrapper', '#usercentrics-root',
+             '[id*="cmp"]', '[class*="cmpwrap"]'].forEach(sel => {
                 document.querySelectorAll(sel).forEach(el => el.remove());
             });
             document.body.style.overflow = 'auto';
             document.documentElement.style.overflow = 'auto';
         }
     """)
-    time.sleep(0.5)
+
+
+def cookie_banner_schliessen(page):
+    for text in ["Ablehnen", "Alle ablehnen", "Alle Akzeptieren"]:
+        try:
+            page.wait_for_selector(f"button:has-text('{text}')", timeout=4000)
+            page.click(f"button:has-text('{text}')")
+            time.sleep(1.5)
+            print(f"  OK Cookie-Banner: '{text}' geklickt")
+            break
+        except PlaywrightTimeout:
+            continue
+    else:
+        print("  - Kein Cookie-Button gefunden")
+    cmp_entfernen(page)
     print("  OK cmpwrapper entfernt")
 
 
-def tippe(page, selector, wert):
-    """Tippt Text ein und loest JS-Validierung aus."""
-    locator = page.locator(selector)
-    locator.click()
-    time.sleep(0.2)
-    locator.fill("")
-    page.keyboard.type(wert, delay=50)
-    page.keyboard.press("Tab")
-    time.sleep(0.3)
+def tippe(page, selector, wert, delay=60):
+    """Befuellt ein Feld zeichenweise und loest JS-Validierung aus."""
+    try:
+        loc = page.locator(selector)
+        loc.scroll_into_view_if_needed(timeout=5000)
+        loc.click()
+        time.sleep(0.2)
+        loc.fill("")
+        page.keyboard.type(wert, delay=delay)
+        page.keyboard.press("Tab")
+        time.sleep(0.3)
+    except Exception as e:
+        print(f"  WARN tippe({selector}): {e}")
+
+
+def dropdown_auswaehlen(page, dropdown_sel, timeout=4000):
+    """Wartet auf Dropdown und klickt ersten Eintrag. Gibt True zurueck wenn geklappt."""
+    try:
+        page.wait_for_selector(dropdown_sel, timeout=timeout)
+        page.locator(dropdown_sel).first.click()
+        time.sleep(0.8)
+        return True
+    except PlaywrightTimeout:
+        return False
+
+
+def submit_schritt(page, erwarteter_naechster_schritt, schritt_nr):
+    """
+    Klickt SubmitForward (mit JS-Fallback wenn disabled).
+    Wartet danach auf den naechsten Schritt.
+    Wirft Exception wenn Submit fehlschlaegt (Formular bleibt auf gleichem Schritt).
+    """
+    cmp_entfernen(page)
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    time.sleep(0.5)
+
+    btn_disabled = page.evaluate("() => { const b = document.getElementById('SubmitForward'); return b ? b.disabled : true; }")
+    if btn_disabled:
+        print(f"  WARN Schritt {schritt_nr}: Button disabled – JS-Unlock")
+        page.evaluate("""
+            () => {
+                const btn = document.getElementById('SubmitForward');
+                if (btn) {
+                    btn.removeAttribute('disabled');
+                    btn.classList.remove('disabled');
+                    btn.click();
+                }
+            }
+        """)
+    else:
+        page.evaluate("document.getElementById('SubmitForward').click()")
+
+    time.sleep(4)
+    cmp_entfernen(page)
+
+    # Pruefen ob naechster Schritt erreicht
+    try:
+        page.wait_for_selector(f"text={erwarteter_naechster_schritt}", timeout=15000)
+        print(f"  OK Schritt {schritt_nr} abgeschlossen → {erwarteter_naechster_schritt}")
+    except PlaywrightTimeout:
+        # Fehlermeldung vom Server lesen
+        server_fehler = page.evaluate("""
+            () => {
+                const el = document.querySelector('.alert, .error-msg, [class*="alert"], [class*="error-message"]');
+                return el ? el.innerText.trim() : '';
+            }
+        """)
+        h1 = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
+        if server_fehler:
+            raise Exception(f"Schritt {schritt_nr} fehlgeschlagen. Server: '{server_fehler}'")
+        raise Exception(f"Schritt {schritt_nr} fehlgeschlagen. Seite: '{h1}'")
 
 
 def fill_form(page, c):
@@ -98,131 +165,115 @@ def fill_form(page, c):
     time.sleep(2)
     print("  OK Grundeintrag gewaehlt")
 
-    # Schritt 1: Formulardaten
+    # ── SCHRITT 1 ────────────────────────────────────────────────────────────
     page.wait_for_selector("#companyname", timeout=15000)
     time.sleep(1)
 
-    # cmpwrapper entfernen + MutationObserver
+    # MutationObserver gegen cmpwrapper
     page.evaluate("""
         () => {
-            document.querySelectorAll('#cmpwrapper, .cmpwrapper, [id*="cmp"]')
-                .forEach(el => el.remove());
+            document.querySelectorAll('#cmpwrapper, .cmpwrapper, [id*="cmp"]').forEach(el => el.remove());
             document.body.style.overflow = 'auto';
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.id && node.id.includes('cmp')) node.remove();
-                        if (node.className && typeof node.className === 'string' && node.className.includes('cmp')) node.remove();
-                    });
-                });
+            const obs = new MutationObserver(muts => {
+                muts.forEach(m => m.addedNodes.forEach(n => {
+                    if (n.id && n.id.includes('cmp')) n.remove();
+                    if (n.className && typeof n.className === 'string' && n.className.includes('cmp')) n.remove();
+                }));
             });
-            observer.observe(document.body, { childList: true, subtree: true });
+            obs.observe(document.body, { childList: true, subtree: true });
         }
     """)
     time.sleep(0.5)
 
+    # Firma + Adresse
     tippe(page, "#companyname", c["firma"])
     tippe(page, "#companystreet", c["strasse"])
-    if c["hausnummer"]:
+    if c.get("hausnummer"):
         tippe(page, "#companyhnr", c["hausnummer"])
 
-    # PLZ befuellen und aus Dropdown auswaehlen (AJAX erfordert Dropdown-Klick)
+    # PLZ – Dropdown-Auswahl notwendig fuer AJAX-Validierung
     page.locator("#companypc").click()
     time.sleep(0.2)
     page.locator("#companypc").fill("")
     page.keyboard.type(c["plz"], delay=100)
     time.sleep(2)
-    try:
-        page.wait_for_selector("#pclist li, #citylist li", timeout=5000)
-        plz_items = page.locator("#pclist li")
-        city_items = page.locator("#citylist li")
-        if plz_items.count() > 0:
-            plz_items.first.click()
-            print("  OK PLZ aus Dropdown (pclist)")
-        elif city_items.count() > 0:
-            city_items.first.click()
-            print("  OK PLZ/Ort aus kombiniertem Dropdown")
-        time.sleep(1)
-    except PlaywrightTimeout:
-        page.locator("#companypc").press("Tab")
-        print("  - PLZ per Tab (kein Dropdown)")
-        time.sleep(1)
 
-    # PLZ-Error-Klasse per JS entfernen falls noch gesetzt
-    plz_klassen = page.evaluate("() => { const el = document.getElementById('companypc'); return el ? el.className : ''; }")
-    if "error" in plz_klassen:
-        print(f"  WARN PLZ im Error-State: {plz_klassen} - JS-Fix")
-        page.evaluate("""
-            () => {
-                const el = document.getElementById('companypc');
-                if (el) {
-                    el.classList.remove('error');
-                    el.dispatchEvent(new Event('change', {bubbles: true}));
-                    el.dispatchEvent(new Event('blur', {bubbles: true}));
-                }
-            }
-        """)
+    if dropdown_auswaehlen(page, "#pclist li, #citylist li", timeout=4000):
+        print("  OK PLZ aus Dropdown gewaehlt")
+    else:
+        page.locator("#companypc").press("Tab")
+        print("  - PLZ per Tab (kein Dropdown erschienen)")
         time.sleep(0.5)
 
-    # Ort befuellen und Dropdown abwarten
+    # PLZ-Error-Klasse entfernen falls noch gesetzt
+    page.evaluate("""
+        () => {
+            const el = document.getElementById('companypc');
+            if (el && el.classList.contains('error')) {
+                el.classList.remove('error');
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }
+    """)
+
+    # Ort – Dropdown-Auswahl
     page.locator("#companycity").click()
     time.sleep(0.3)
     page.locator("#companycity").fill("")
     page.keyboard.type(c["ort"], delay=80)
     time.sleep(2)
 
-    try:
-        page.wait_for_selector("#citylist li", timeout=5000)
-        page.locator("#citylist li").first.click()
+    if dropdown_auswaehlen(page, "#citylist li", timeout=5000):
         print("  OK Ort aus Dropdown gewaehlt")
-        time.sleep(1)
-    except PlaywrightTimeout:
+    else:
         page.locator("#companycity").press("Enter")
         print("  - Ort per Enter bestaetigt")
-        time.sleep(1)
+        time.sleep(0.5)
 
-    # Warten bis Telefon-Felder enabled werden
+    # Telefon-Felder freischalten
     print("  Warte auf Freischaltung der Telefon-Felder...")
     try:
-        page.wait_for_selector("#companytelpre:not([disabled])", timeout=15000)
+        page.wait_for_selector("#companytelpre:not([disabled])", timeout=12000)
         print("  OK Telefon-Felder freigeschaltet")
     except PlaywrightTimeout:
         print("  - Aktiviere Telefon-Felder per JS...")
         page.evaluate("""
             () => {
-                document.querySelectorAll('.part2').forEach(el => {
+                document.querySelectorAll('.part2, #companytelpre, #companytelnumber, #companymobtelpre, #companymobtelnumber').forEach(el => {
                     el.removeAttribute('disabled');
                     el.classList.remove('disabled');
                 });
-                document.querySelectorAll('.inputwrap.disabled').forEach(el => {
-                    el.classList.remove('disabled');
-                });
+                document.querySelectorAll('.inputwrap.disabled').forEach(el => el.classList.remove('disabled'));
             }
         """)
         time.sleep(0.5)
 
     # Telefon
-    if c["telpre"] and c["telnummer"]:
+    if c.get("telpre") and c.get("telnummer"):
         tippe(page, "#companytelpre", c["telpre"])
         tippe(page, "#companytelnumber", c["telnummer"])
+        print(f"  OK Festnetz: {c['telpre']} {c['telnummer']}")
 
-    if c["mobtelpre"] and c["mobtelnummer"]:
+    if c.get("mobtelpre") and c.get("mobtelnummer"):
         tippe(page, "#companymobtelpre", c["mobtelpre"])
         tippe(page, "#companymobtelnumber", c["mobtelnummer"])
+        print(f"  OK Mobil: {c['mobtelpre']} {c['mobtelnummer']}")
 
     # Website + Social Media
-    if c["website"]:
+    if c.get("website"):
         tippe(page, "#companyurl", c["website"])
-    if c["facebook"]:
+    if c.get("facebook"):
         tippe(page, "#socfacebook", c["facebook"])
-    if c["instagram"]:
+    if c.get("instagram"):
         tippe(page, "#socinstagram", c["instagram"])
 
-    # E-Mail
-    if c.get("email"):
-        tippe(page, "#companyemail", c["email"])
-        email_aktuell = page.evaluate("() => { const el = document.getElementById('companyemail'); return el ? el.value : 'nicht gefunden'; }")
-        print(f"  DEBUG E-Mail im Feld: {email_aktuell}")
+    # E-Mail – nur Business-Adressen, Das Oertliche lehnt Freemail ab
+    email = c.get("email", "")
+    if email and not ist_freemail(email):
+        tippe(page, "#companyemail", email)
+        print(f"  OK E-Mail: {email}")
+    elif email:
+        print(f"  - E-Mail uebersprungen (Freemail): {email}")
 
     # Branche
     page.locator("#rubric").click()
@@ -230,117 +281,90 @@ def fill_form(page, c):
     page.locator("#rubric").fill("")
     page.keyboard.type(c["branche"], delay=80)
     time.sleep(2)
-    try:
-        page.wait_for_selector("#rubriclist li", timeout=4000)
-        page.locator("#rubriclist li").first.click()
-        print("  OK Branche aus Dropdown gewaehlt")
-    except PlaywrightTimeout:
-        branche_val = c["branche"].replace("'", "\\'")
+
+    if dropdown_auswaehlen(page, "#rubriclist li", timeout=4000):
+        print(f"  OK Branche aus Dropdown: {c['branche']}")
+    else:
+        # JS-Fallback: Wert direkt setzen
+        branche_safe = c["branche"].replace("\\", "\\\\").replace("'", "\\'")
         page.evaluate(f"""
             () => {{
-                document.getElementById('rubric').value = '{branche_val}';
-                const rubricid = document.getElementById('rubricid');
-                if (rubricid) rubricid.value = '0000001';
+                const el = document.getElementById('rubric');
+                if (el) el.value = '{branche_safe}';
+                const rid = document.getElementById('rubricid');
+                if (rid) rid.value = '0000001';
+                if (el) el.dispatchEvent(new Event('change', {{bubbles: true}}));
             }}
         """)
-        print("  - Branche per JS gesetzt")
-    time.sleep(1)
-
-    # Debug: PLZ-Validierungsstatus prüfen
-    plz_valid = page.evaluate("""
-        () => {
-            const el = document.getElementById('companypc');
-            if (!el) return 'nicht gefunden';
-            return {
-                value: el.value,
-                classes: el.className,
-                disabled: el.disabled
-            };
-        }
-    """)
-    print(f"  DEBUG PLZ-Status: {plz_valid}")
-
-    # Weiter-Button per JS aktivieren falls PLZ-Validierung hängt
-    page.evaluate("""
-        () => {
-            const btn = document.getElementById('SubmitForward');
-            if (btn && btn.disabled) {
-                // Validierungsfehler prüfen
-                const errors = document.querySelectorAll('.error, .invalid, [class*="error"]');
-                console.log('Fehler gefunden:', errors.length);
-            }
-        }
-    """)
-
-    # Submit: erst per normalem Klick versuchen, Fallback per JS-Unlock
-    page.locator("#SubmitForward").scroll_into_view_if_needed()
-    time.sleep(0.5)
-    btn_disabled = page.evaluate("() => document.getElementById('SubmitForward').disabled")
-    if btn_disabled:
-        print("  WARN SubmitForward disabled – entsperre per JS und klicke")
-        page.evaluate("""
-            () => {
-                const btn = document.getElementById('SubmitForward');
-                btn.removeAttribute('disabled');
-                btn.classList.remove('disabled');
-                btn.click();
-            }
-        """)
-    else:
-        page.locator("#SubmitForward").click()
-    time.sleep(4)
-    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
+        print(f"  - Branche per JS gesetzt: {c['branche']}")
     time.sleep(0.5)
 
-    aktuell = page.evaluate("() => document.querySelector('h1') ? document.querySelector('h1').textContent.trim() : ''")
-    print(f"  DEBUG aktuelle Seite nach Submit: {aktuell}")
-    print("  OK Schritt 1 abgeschlossen")
+    # PLZ-Status loggen (fuer Debugging)
+    plz_info = page.evaluate("() => { const e = document.getElementById('companypc'); return e ? e.className : ''; }")
+    print(f"  DEBUG PLZ-Klassen: {plz_info}")
 
-    # Schritt 2: Oeffnungszeiten + Logo (ueberspringen)
-    page.wait_for_selector("text=Schritt 2 von 4", timeout=20000)
+    # Submit Schritt 1 → erwartet Schritt 2
+    submit_schritt(page, "Schritt 2 von 4", schritt_nr=1)
+
+    # ── SCHRITT 2: Oeffnungszeiten + Logo (ueberspringen) ────────────────────
     time.sleep(0.5)
     page.evaluate("document.getElementById('SubmitForward').click()")
     time.sleep(3)
-    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
-    time.sleep(0.5)
-    print("  OK Schritt 2 uebersprungen")
+    cmp_entfernen(page)
 
-    # Schritt 3: Zahlungsmethoden + Beschreibung
-    page.wait_for_selector("text=Schritt 3 von 4", timeout=20000)
+    try:
+        page.wait_for_selector("text=Schritt 3 von 4", timeout=15000)
+        print("  OK Schritt 2 uebersprungen")
+    except PlaywrightTimeout:
+        raise Exception("Schritt 2 → Schritt 3 fehlgeschlagen")
+
+    # ── SCHRITT 3: Beschreibung + Zahlungsmethoden ────────────────────────────
     time.sleep(0.5)
-    if c["beschreibung"]:
-        page.locator("#freetext").fill(c["beschreibung"][:500])
+    if c.get("beschreibung"):
+        try:
+            page.locator("#freetext").fill(c["beschreibung"][:500])
+            time.sleep(0.3)
+            print("  OK Beschreibung eingetragen")
+        except Exception:
+            pass
+    page.evaluate("document.getElementById('SubmitForward').click()")
+    time.sleep(3)
+    cmp_entfernen(page)
+
+    try:
+        page.wait_for_selector("text=Schritt 4 von 4", timeout=15000)
+        print("  OK Schritt 3 abgeschlossen")
+    except PlaywrightTimeout:
+        raise Exception("Schritt 3 → Schritt 4 fehlgeschlagen")
+
+    # ── SCHRITT 4: Ansprechpartner + Abschluss ────────────────────────────────
+    time.sleep(1)
+    cmp_entfernen(page)
+
+    try:
+        page.locator("#contactfirstname").fill(c["kontakt_vorname"])
+        time.sleep(0.2)
+        page.locator("#contactlastname").fill(c["kontakt_nachname"])
+        time.sleep(0.2)
+        page.locator("#contactprefixnumber").fill(c["kontakt_telpre"])
+        time.sleep(0.2)
+        page.locator("#contactcallnumber").fill(c["kontakt_telnummer"])
+        time.sleep(0.2)
+        page.locator("#contactemail").fill(c["kontakt_email"])
         time.sleep(0.3)
-    page.evaluate("document.getElementById('SubmitForward').click()")
-    time.sleep(3)
-    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
-    time.sleep(0.5)
-    print("  OK Schritt 3 abgeschlossen")
+        print(f"  OK Ansprechpartner: {c['kontakt_vorname']} {c['kontakt_nachname']}")
+    except Exception as e:
+        raise Exception(f"Schritt 4 Kontaktfelder: {e}")
 
-    # Schritt 4: Vorschau + Ansprechpartner
-    page.wait_for_selector("text=Schritt 4 von 4", timeout=20000)
-    time.sleep(1)
-    page.evaluate("document.querySelectorAll('#cmpwrapper, .cmpwrapper').forEach(el => el.remove())")
-    time.sleep(0.5)
-
-    page.locator("#contactfirstname").fill(c["kontakt_vorname"])
-    time.sleep(0.3)
-    page.locator("#contactlastname").fill(c["kontakt_nachname"])
-    time.sleep(0.3)
-    page.locator("#contactprefixnumber").fill(c["kontakt_telpre"])
-    time.sleep(0.3)
-    page.locator("#contactcallnumber").fill(c["kontakt_telnummer"])
-    time.sleep(0.3)
-    page.locator("#contactemail").fill(c["kontakt_email"])
-    time.sleep(0.5)
-
+    # Submit Schritt 4
     page.evaluate("document.getElementById('SubmitForward').removeAttribute('disabled')")
     time.sleep(0.3)
     page.evaluate("document.getElementById('SubmitForward').click()")
-    time.sleep(3)
+    time.sleep(4)
+
     print("  OK Eintrag abgesendet!")
-    print(f"\n  E-Mail geht an: {c['kontakt_email']}")
-    print("  Ansprechpartner muss den Link bestaetigen.")
+    print(f"\n  Bestaetigung geht an: {c['kontakt_email']}")
+    print("  Ansprechpartner muss den Link in der E-Mail bestaetigen.")
 
 
 def main():
