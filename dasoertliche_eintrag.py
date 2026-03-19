@@ -1,3 +1,32 @@
+import json
+import urllib.request
+
+PORTAL = "Das Oertliche"  # ← pro Script anpassen
+WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/16619542/uxr6x3s/"
+
+def webhook_fehler(firma, fehler_text):
+    try:
+        data = json.dumps({
+            "portal": PORTAL, "firma": firma,
+            "status": "fehler", "fehler": fehler_text[:300]
+        }).encode("utf-8")
+        req = urllib.request.Request(WEBHOOK_URL, data=data,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            print(f"  OK Webhook: {r.status}")
+    except Exception as e:
+        print(f"  WARN Webhook: {e}")
+
+def fehler_beschreiben(e):
+    msg = str(e)
+    if "Pflichtfelder" in msg: return f"Fehlende Felder: {msg.split(': ',1)[-1]}"
+    if "Mobilnummer" in msg: return "Mobilnummer ungültig (015x/016x/017x)"
+    if "E-Mail" in msg or "email" in msg.lower(): return "E-Mail ungültig oder bereits registriert"
+    if "Branche" in msg: return "Branche nicht gefunden"
+    if "Timeout" in msg: return "Seite reagiert nicht – erneut versuchen"
+    if "net::" in msg or "ERR_" in msg: return "Netzwerkfehler – Portal nicht erreichbar"
+    return msg[:200]
+
 import os
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
