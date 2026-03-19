@@ -274,6 +274,10 @@ def fill_form(page, c):
         """)
         time.sleep(0.5)
 
+    # cmpwrapper vor Telefon entfernen – wird nach Ort-Auswahl neu geladen
+    cmp_entfernen(page)
+    time.sleep(0.3)
+
     if c.get("telpre") and c.get("telnummer"):
         tippe(page, "#companytelpre", c["telpre"])
         tippe(page, "#companytelnumber", c["telnummer"])
