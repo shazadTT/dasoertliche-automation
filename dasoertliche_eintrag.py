@@ -298,6 +298,10 @@ def fill_form(page, c):
     elif email:
         print(f"  - E-Mail uebersprungen (Freemail): {email}")
 
+    # cmpwrapper nochmal entfernen – Das Oertliche laedt ihn nach Formular-Interaktion neu
+    cmp_entfernen(page)
+    time.sleep(0.3)
+
     page.locator("#rubric").click()
     time.sleep(0.2)
     page.locator("#rubric").fill("")
