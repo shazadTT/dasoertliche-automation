@@ -274,18 +274,27 @@ def fill_form(page, c):
         """)
         time.sleep(0.5)
 
-    # cmpwrapper vor Telefon entfernen – wird nach Ort-Auswahl neu geladen
-    cmp_entfernen(page)
-    time.sleep(0.3)
-
+    # Telefon per JS direkt setzen – cmpwrapper blockiert click() zu oft
     if c.get("telpre") and c.get("telnummer"):
-        tippe(page, "#companytelpre", c["telpre"])
-        tippe(page, "#companytelnumber", c["telnummer"])
+        cmp_entfernen(page)
+        page.evaluate(f"""() => {{
+            const pre = document.getElementById('companytelpre');
+            const num = document.getElementById('companytelnumber');
+            if (pre) {{ pre.value = '{c["telpre"]}'; pre.dispatchEvent(new Event('input', {{bubbles:true}})); pre.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            if (num) {{ num.value = '{c["telnummer"]}'; num.dispatchEvent(new Event('input', {{bubbles:true}})); num.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+        }}""")
+        time.sleep(0.3)
         print(f"  OK Festnetz: {c['telpre']} {c['telnummer']}")
 
     if c.get("mobtelpre") and c.get("mobtelnummer"):
-        tippe(page, "#companymobtelpre", c["mobtelpre"])
-        tippe(page, "#companymobtelnumber", c["mobtelnummer"])
+        cmp_entfernen(page)
+        page.evaluate(f"""() => {{
+            const pre = document.getElementById('companymobtelpre');
+            const num = document.getElementById('companymobtelnumber');
+            if (pre) {{ pre.value = '{c["mobtelpre"]}'; pre.dispatchEvent(new Event('input', {{bubbles:true}})); pre.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            if (num) {{ num.value = '{c["mobtelnummer"]}'; num.dispatchEvent(new Event('input', {{bubbles:true}})); num.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+        }}""")
+        time.sleep(0.3)
         print(f"  OK Mobil: {c['mobtelpre']} {c['mobtelnummer']}")
 
     if c.get("website"):
