@@ -256,6 +256,23 @@ def normalisiere_daten(c, log=print):
                     log(f"  ~ Korrektur: {pre}/{num} '{c.get(pre)}'/'{c.get(num)}' -> '{vw}'/'{rn}'")
                 c[pre], c[num] = vw, rn
 
+    # Straße: "Kreuzstraße 27, 45770 Marl" -> Straße + Hausnummer trennen, PLZ/Ort entfernen
+    if c.get("strasse"):
+        st = c["strasse"]
+        m = re.match(r"^(.*?)[\s,]+(\d{4,5})\s+[^\d,]+$", st)          # "... , 45770 Marl"
+        if m:
+            st = m.group(1).strip(" ,")
+            log(f"  ~ Korrektur: PLZ/Ort aus Straße entfernt -> '{st}'")
+        m = re.match(r"^(.*?\D)\s+(\d+\s?[a-zA-Z]?)$", st)               # "Kreuzstraße 27"
+        if m and "hausnummer" in c:
+            if not c.get("hausnummer"):
+                c["hausnummer"] = m.group(2).replace(" ", "")
+                log(f"  ~ Korrektur: Hausnummer aus Straße übernommen -> {c['hausnummer']}")
+            if c.get("hausnummer", "").lower() == m.group(2).replace(" ", "").lower():
+                st = m.group(1).strip(" ,")
+                log(f"  ~ Korrektur: Hausnummer aus Straßenfeld entfernt -> '{st}'")
+        c["strasse"] = st
+
     for feld in ("website", "url"):
         w = c.get(feld, "")
         if w and w.lower() in ("keine", "nein", "-", "n/a", "none", "null"):
