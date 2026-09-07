@@ -3,6 +3,7 @@ import time
 import json
 import urllib.request
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from am_utils import normalisiere_daten, pruefe_deutsche_plz, waehle_branche
 
 PORTAL = "Das Oertliche"
 WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/16619542/uxr6x3s/"
@@ -84,6 +85,7 @@ def validiere(c):
         raise ValueError(f"Pflichtfelder fehlen: {', '.join(fehlend)}")
     if not c.get("telpre") and not c.get("mobtelpre"):
         raise ValueError("Mindestens Festnetz-Vorwahl oder Mobil-Vorwahl erforderlich")
+    pruefe_deutsche_plz(c.get("plz", ""), c.get("ort", ""))
 
 
 def ist_freemail(email):
@@ -315,14 +317,25 @@ def fill_form(page, c):
     cmp_entfernen(page)
     time.sleep(0.3)
 
-    page.locator("#rubric").click()
-    time.sleep(0.2)
-    page.locator("#rubric").fill("")
-    page.keyboard.type(c["branche"], delay=80)
-    time.sleep(2)
+    def rubrik_optionen(begriff):
+        page.locator("#rubric").click()
+        time.sleep(0.2)
+        page.locator("#rubric").fill("")
+        page.keyboard.type(begriff, delay=80)
+        time.sleep(2)
+        try:
+            page.wait_for_selector("#rubriclist li", timeout=2500)
+        except PlaywrightTimeout:
+            return []
+        return [t.strip() for t in page.locator("#rubriclist li").all_text_contents() if t.strip()]
 
-    if dropdown_auswaehlen(page, "#rubriclist li", timeout=4000):
-        print(f"  OK Branche aus Dropdown: {c['branche']}")
+    treffer, begriff = waehle_branche(c["branche"], rubrik_optionen, portal="dasoertliche")
+    if treffer:
+        if treffer not in rubrik_optionen(begriff):
+            print("  – Rubrik-Liste neu geladen")
+        page.locator("#rubriclist li", has_text=treffer).first.click()
+        time.sleep(0.8)
+        print(f"  OK Branche aus Dropdown: {treffer}")
     else:
         branche_safe = c["branche"].replace("\\", "\\\\").replace("'", "\\'")
         page.evaluate(f"""
@@ -334,7 +347,7 @@ def fill_form(page, c):
                 if (el) el.dispatchEvent(new Event('change', {{bubbles: true}}));
             }}
         """)
-        print(f"  - Branche per JS: {c['branche']}")
+        print(f"  - Branche per JS (Freitext, kein Katalog-Treffer): {c['branche']}")
     time.sleep(0.5)
 
     submit_schritt(page, "Schritt 2 von 4", schritt_nr=1)
@@ -402,6 +415,8 @@ def main():
 
     c = get_data()
     firma = c.get("firma", "unbekannt")
+    normalisiere_daten(c)
+    print(f"  Daten: PLZ={c['plz']} Ort={c['ort']} Tel={c['telpre']}/{c['telnummer']} Mobil={c['mobtelpre']}/{c['mobtelnummer']} Branche={c['branche']}")
 
     try:
         validiere(c)
