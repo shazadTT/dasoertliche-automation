@@ -330,12 +330,14 @@ _SYNONYME = {
     "ingenieur":            ["Ingenieurbüros", "Ingenieurbüro", "Ingenieurbüros: Bauwesen"],
     "elektriker":           ["Elektroinstallationen", "Elektriker", "Elektrotechnik"],
     "sanitär":              ["Sanitärinstallation", "Sanitär", "Installateur"],
+    "hörgeräteakustik":     ["Hörsysteme", "Hörgeräte", "Hörgerät", "Hörakustik"],
 }
 
 # Portal-spezifische Kategorienamen (heute im jeweiligen Portal verifiziert).
 # Diese werden VOR den generischen Synonymen probiert.
 _PORTAL_SYNONYME = {
     "gelbeseiten": {
+        "hörgeräteakustik":   ["Hörsysteme"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtarbeiten"],
         "innenabdichtung":    ["Abdichtarbeiten", "Kellerabdichtungen"],
@@ -345,6 +347,7 @@ _PORTAL_SYNONYME = {
         "schimmelsanierung":  ["Schimmelpilzbekämpfung"],
     },
     "11880": {
+        "hörgeräteakustik":   ["Hörgerät"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtungstechnik"],
         "innenabdichtung":    ["Abdichtungstechnik"],
@@ -371,6 +374,7 @@ _PORTAL_SYNONYME = {
         "zimmerer":           ["Zimmerei"],
     },
     "telefonbuch": {
+        "hörgeräteakustik":   ["Hörsysteme"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtarbeiten"],
         "innenabdichtung":    ["Abdichtarbeiten", "Kellerabdichtungen"],
@@ -387,6 +391,7 @@ _PORTAL_SYNONYME = {
         "wärmepumpe":         ["Wärmepumpen"],
     },
     "opendi": {
+        "hörgeräteakustik":   ["Hörgeräte"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichten"],
         "innenabdichtung":    ["Abdichten", "Kellerisolierungen"],
@@ -397,7 +402,9 @@ _PORTAL_SYNONYME = {
         "schimmelsanierung":  ["Schimmelpilzbekämpfung"],
         "maler":              ["Maler"],
     },
-    "dasoertliche": {},
+    "dasoertliche": {
+        "hörgeräteakustik":   ["Hörsysteme"],
+    },
 }
 
 # Optionen, die (fast) nie gemeint sind, wenn ein Handwerksbetrieb eingetragen wird
