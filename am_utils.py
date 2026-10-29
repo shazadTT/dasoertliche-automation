@@ -331,12 +331,21 @@ _SYNONYME = {
     "elektriker":           ["Elektroinstallationen", "Elektriker", "Elektrotechnik"],
     "sanitär":              ["Sanitärinstallation", "Sanitär", "Installateur"],
     "hörgeräteakustik":     ["Hörsysteme", "Hörgeräte", "Hörgerät", "Hörakustik"],
+    "folierung":            ["Autofolien", "Autofolierung", "Fahrzeugbeschriftungen", "Autobeschriftungen", "Folientechnik", "Werbetechnik", "Folien"],
+    "autoglasservice":      ["Autoglasereien", "Autoglaserei", "Autoglas", "Glasereien"],
+    "osteopathie":          ["Osteopathie", "Heilpraktiker Osteopathie", "Heilpraktiker: Osteopathie"],
+    "zahnarzt":             ["Zahnärzte", "Zahnarzt"],
 }
 
 # Portal-spezifische Kategorienamen (heute im jeweiligen Portal verifiziert).
 # Diese werden VOR den generischen Synonymen probiert.
 _PORTAL_SYNONYME = {
     "gelbeseiten": {
+        # Folierung / Autoglasservice / Osteopathie / Zahnarzt – im Portal verifiziert am 29.10.2026
+        "folierung":          ["Fahrzeugbeschriftungen", "Autobeschriftungen", "Autoglasfolien", "Folien"],
+        "autoglasservice":    ["Autoglasereien"],
+        "osteopathie":        ["Osteopathie"],
+        "zahnarzt":           ["Zahnärzte"],
         "hörgeräteakustik":   ["Hörsysteme"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtarbeiten"],
@@ -347,6 +356,11 @@ _PORTAL_SYNONYME = {
         "schimmelsanierung":  ["Schimmelpilzbekämpfung"],
     },
     "11880": {
+        # Folierung / Autoglasservice / Osteopathie / Zahnarzt – im Portal verifiziert am 29.10.2026
+        "folierung":          ["Autofolierung", "Folientechnik", "Werbetechnik"],
+        "autoglasservice":    ["Autoglas"],
+        "osteopathie":        ["Heilpraktiker Osteopathie"],
+        "zahnarzt":           ["Zahnarzt"],
         "hörgeräteakustik":   ["Hörgerät"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtungstechnik"],
@@ -374,6 +388,11 @@ _PORTAL_SYNONYME = {
         "zimmerer":           ["Zimmerei"],
     },
     "telefonbuch": {
+        # Folierung / Autoglasservice / Osteopathie / Zahnarzt – im Portal verifiziert am 29.10.2026
+        "folierung":          ["Autofolien", "Fahrzeugbeschriftungen", "Folienbeschriftung"],
+        "autoglasservice":    ["Autoglasereien"],
+        "osteopathie":        ["Osteopathie"],
+        "zahnarzt":           ["Zahnärzte"],
         "hörgeräteakustik":   ["Hörsysteme"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichtarbeiten"],
@@ -391,6 +410,11 @@ _PORTAL_SYNONYME = {
         "wärmepumpe":         ["Wärmepumpen"],
     },
     "opendi": {
+        # Folierung / Autoglasservice / Osteopathie / Zahnarzt – im Portal verifiziert am 29.10.2026
+        "folierung":          ["Autofolien", "Fahrzeugbeschriftungen", "Folien"],
+        "autoglasservice":    ["Autoglaserei", "Autoglas"],
+        "osteopathie":        ["Osteopathie"],
+        "zahnarzt":           ["Zahnarzt"],
         "hörgeräteakustik":   ["Hörgeräte"],
         "rohrreinigung":      ["Rohrreinigung"],
         "abdichtung":         ["Abdichten"],
@@ -403,6 +427,11 @@ _PORTAL_SYNONYME = {
         "maler":              ["Maler"],
     },
     "dasoertliche": {
+        # Folierung / Autoglasservice / Osteopathie / Zahnarzt – im Portal verifiziert am 29.10.2026
+        "folierung":          ["Autofolien", "Fahrzeugbeschriftungen", "Autobeschriftungen"],
+        "autoglasservice":    ["Autoglasereien"],
+        "osteopathie":        ["Osteopathie"],
+        "zahnarzt":           ["Zahnärzte"],
         "hörgeräteakustik":   ["Hörsysteme"],
     },
 }
